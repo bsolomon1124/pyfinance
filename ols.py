@@ -12,7 +12,7 @@ from pandas import DataFrame, Series
 import scipy.stats as scs
 from statsmodels.tools import add_constant
 
-
+from pyfinance import utils
 
 # TODO: why not make `y` always 2d?
 # TODO: use np.atleast_1d when you're getting a 0d array of a single scalar
@@ -405,12 +405,15 @@ class RollingOLS(OLS):
     def __init__(self, y, x=None, window=None, hasconst=False, names=None):
         OLS.__init__(self, y=y, x=x, hasconst=hasconst, names=names)
             
-        self.xwins = rwindows(self.x, window=window)
-        self.ywins = rwindows(self.y, window=window)
+        self.xwins = utils.rolling_windows(self.x, window=window)
+        self.ywins = utils.rolling_windows(self.y, window=window)
 
         # TODO: iterator?
         self.models = [OLS(y=ywin, x=xwin) for ywin, xwin 
                        in zip(self.ywins, self.xwins)]
+
+    if window is None:
+        raise ValueError('must specify `window`')
 
     def _rolling_stat(self, stat, **kwargs):
         """Core generic method of the class."""

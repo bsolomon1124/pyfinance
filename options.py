@@ -2,7 +2,21 @@
 
 Descriptions
 ============
-# TODO
+BSM
+    Black-Scholes Merton European option valuation, Greeks, and implied vol.
+Call
+    European call option payoff & profit.
+Put
+    European put option payoff & profit.
+OpStrat
+    Generic options strategy class.  Base class for classes below.
+
+Specialized strategies inheriting from OpStrat:
+- Straddle
+- BullSpread
+- BearSpread
+- LongButterfly
+- ShortButterfly
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
@@ -13,6 +27,8 @@ __all__ = [
     ]
 
 from collections import OrderedDict
+import itertools
+import warnings
 
 import numpy as np
 from pandas import DataFrame
@@ -21,7 +37,7 @@ from scipy.stats import norm
 # TODO: covered call, protective/married put, collar,
 #       long butterfly, short butterfly, long iron butterfly,
 #       short iron butterfly, long condor, short condor, long iron condor,
-#       short iron condor
+#       short iron condor.
 
 class BSM(object):
     """Compute European option value, greeks, and implied vol, using BSM.
@@ -147,12 +163,11 @@ class BSM(object):
         return ((norm.cdf(self.d1, 0.0, 1.0) + self._sign[0])
                    * self.S0 / self.value())
 
-    def implied_vol(self, value, iter=100):
+    def implied_vol(self, value, iters=100):
         """Get implied vol at the specified price.  Iterative approach."""
         vol = 0.4
         precision = 1.0e-5
-        # TODO: itertools.repeat
-        for _ in range(iter):
+        for _ in itertools.repeat(None, iters):
             opt = BSM(S0=self.S0, K=self.K, T=self.T, r=self.r, sigma=vol,
                       kind=self.kind)
             diff = value - opt.value()
@@ -290,17 +305,15 @@ class OpStrat(object):
         payoffs = self.payoff(St=St)
         profits = self.profit(St=St)
         plt.plot(St, payoffs, St, profits)
-        # TODO: title, legend, etc
-        # or maybe just return tuple of arrays?
+        # TODO: Maybe just return tuple of arrays so as not to restrict end
+        #     flexibility?
 
 class Straddle(OpStrat):
     def __init__(self, St=None, K=None, callprice=None, putprice=None):
         OpStrat.__init__(self, St=St)
-
         self.K = K
         self.callprice = callprice
         self.putprice = putprice
-
         self.add_option(K=K, price=callprice, St=St, kind='call')
         self.add_option(K=K, price=putprice, St=St, kind='put')
 
@@ -315,12 +328,10 @@ class Strangle(OpStrat):
     def __init__(self, St=None, K1=None, K2=None, callprice=None,
                  putprice=None):
         OpStrat.__init__(self, St=St)
-
         self.K1 = K1
         self.K2 = K2
         self.callprice = callprice
         self.putprice = putprice
-
         self.add_option(K=K1, price=callprice, St=St, kind='call')
         self.add_option(K=K2, price=putprice, St=St, kind='put')
 
@@ -328,11 +339,9 @@ class BullSpread(OpStrat):
     def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None,
                  kind='call'):
         OpStrat.__init__(self, St=St)
-
         self.K = K
         self.price1 = price1
         self.price2 = price2
-
         self.add_option(K=K1, price=price1, St=St, kind=kind, pos='long')
         self.add_option(K=K2, price=price2, St=St, kind=kind, pos='short')
 
@@ -349,12 +358,10 @@ class BearSpread(OpStrat):
     def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None,
                  kind='put'):
         OpStrat.__init__(self, St=St)
-
         self.K2 = K1
         self.K2 = K2
         self.price1 = price1
         self.price2 = price2
-
         self.add_option(K=K1, price=price1, St=St, kind=kind, pos='short')
         self.add_option(K=K2, price=price2, St=St, kind=kind, pos='long')
 
@@ -368,19 +375,19 @@ class LongButterfly(OpStrat):
     narrow range.
     """
 
-    # TODO: equidistant strike check/logic
-
     def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
                  price2=None, price3=None, kind='call'):
-        OpStrat.__init__(self, St=St)
 
+        if (K3 + K1) / 2 != K2:
+            warnings.warn('specified strikes are not equidistant.')
+
+        OpStrat.__init__(self, St=St)
         self.K1 = K1
         self.K2 = K2
         self.K3 = K3
         self.price1 = price1
         self.price2 = price2
         self.price3 = price3
-
         self.add_option(K=K1, price=price1, St=St, kind=kind, pos='long')
         self.add_option(K=K2, price=price2, St=St, kind=kind, pos='short')
         self.add_option(K=K2, price=price2, St=St, kind=kind, pos='short')
@@ -398,7 +405,6 @@ class ShortButterfly(OpStrat):
         self.price1 = price1
         self.price2 = price2
         self.price3 = price3
-
         self.add_option(K=K1, price=price1, St=St, kind=kind, pos='short')
         self.add_option(K=K2, price=price2, St=St, kind=kind, pos='long')
         self.add_option(K=K2, price=price2, St=St, kind=kind, pos='long')

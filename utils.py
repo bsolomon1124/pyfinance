@@ -55,6 +55,7 @@ __all__ = [
 from functools import wraps
 import inspect
 import itertools
+import random
 import re
 import string
 import textwrap
@@ -67,6 +68,34 @@ import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
 from pandas.tseries import offsets
+
+# Text to digit translation used in `constrain_horizon`
+TEXTTONUM = {
+    'zero': 0,
+    'one': 1,
+    'two': 2,
+    'three': 3,
+    'four': 4,
+    'five': 5,
+    'six': 6,
+    'seven': 7,
+    'eight': 8,
+    'nine': 9,
+    'ten': 10,
+    'eleven': 11,
+    'twelve': 12,
+    'thirteen': 13,
+    'fourteen': 14,
+    'fifteen': 15,
+    'sixteen': 16,
+    'seventeen': 17,
+    'eighteen': 18,
+    'nineteen': 19,
+    'twenty': 20,
+    'twenty four': 24,
+    'thirty six': 36,
+    }
+
 
 def appender(defaultdocs, passed_to=None):
     """Decorator for appending commonly used parameter definitions.
@@ -112,6 +141,7 @@ def appender(defaultdocs, passed_to=None):
 
     return _doc
 
+
 def avail(df):
     """Return start & end availability for each column in a DataFrame."""
     avail = DataFrame({
@@ -120,14 +150,16 @@ def avail(df):
                      })
     return avail[['start', 'end']]
 
+
 def can_broadcast(*args):
     """Logic test: can input arrays be broadcast?"""
-    # TODO: def fix_broadcast: attempt to reshape
+    # TODO: `def fix_broadcast`: attempt to reshape
     try:
         np.broadcast(*args)
         return True
     except ValueError:
         return False
+
 
 def convertfreq(freq):
     """Convert string frequencies to periods per year.
@@ -174,6 +206,7 @@ def convertfreq(freq):
 
     return freqs[freq]
 
+
 def constrain(*objs):
     """Constrain group of DataFrames & Series to intersection of indices.
 
@@ -188,15 +221,16 @@ def constrain(*objs):
     """
 
     # TODO: build in the options to first dropna on each index before finding
-    #   intersection, AND to use `dropcol` from this module.  Note that this
-    #   would require filtering out Series to which dropcol isn't applicable
+    #     intersection, AND to use `dropcol` from this module.  Note that this
+    #     would require filtering out Series to which dropcol isn't applicable.
 
-    # A little bit of set magic below:
-    # note that pd.Index.intersection only applies to 2 Index objects
+    # A little bit of set magic below.
+    # Note that pd.Index.intersection only applies to 2 Index objects
     common_idx = pd.Index(set.intersection(*[set(o.index) for o in objs]))
     new_dfs = [o.reindex(common_idx) for o in objs]
 
     return tuple(new_dfs)
+
 
 def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
                       months=0, days=0, weeks=0,  year=None, month=None,
@@ -278,6 +312,7 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
                          % r.index[0])
     return r[start:end]
 
+
 def dropcols(df, start=None, end=None):
     """Drop columns that contain NaN within [start, end] inclusive.
 
@@ -318,8 +353,6 @@ def dropcols(df, start=None, end=None):
 
     """
 
-    # TODO: how do you want to handle instances where
-
     if isinstance(df, Series):
         raise ValueError('func only applies to `pd.DataFrame`')
     if start is None:
@@ -328,6 +361,7 @@ def dropcols(df, start=None, end=None):
         end = df.index[-1]
     subset = df.index[(df.index >= start) & (df.index <= end)]
     return df.dropna(axis=1, subset=subset)
+
 
 def _uniquewords(*args):
     """Dictionary of words to their indices.  Helper function to `encode.`"""
@@ -339,6 +373,7 @@ def _uniquewords(*args):
             n += 1
     return words
 
+
 def encode(*args):
     """One-hot encode the given input strings."""
     args = [arg.split() for arg in args]
@@ -348,6 +383,7 @@ def encode(*args):
         for word in s:
             vec[unique[word]] = 1
     return feature_vectors
+
 
 def equal_weights(n, sumto=1.):
     """Generate `n` equal weights (decimals) summing to `sumto`.
@@ -393,6 +429,7 @@ def expanding_stdize(obj, **kwargs):
     return (obj - obj.expanding(**kwargs).mean()) \
          / (obj.expanding(**kwargs).std())
 
+
 def flatten(iterable):
     """Flatten a nested iterable.  Returns a generator object.
 
@@ -425,12 +462,14 @@ def flatten(iterable):
         else:
             yield e
 
+
 def isiterable(obj):
     try:
         obj.__iter__()
         return True
     except AttributeError:
         return False
+
 
 def pickle_option(func):
     sig = inspect.signature(func)
@@ -457,14 +496,13 @@ def pickle_option(func):
 
     return wrapper
 
+
 def public_dir(obj, underscores=1):
-    """public_dir(obj, underscores=1) -> list of strings
+    """Wrapper around `dir`, but designed to exclude (semi-) private methods.
 
     Return an alphabetized list of names comprising the attributes
     of the given object, EXCEPT those starting with the specified number of
-    `underscores`.
-
-    Like `dir`, but designed to exclude (semi-) private methods.
+    `underscores`.  
 
     Example
     =======
@@ -491,7 +529,8 @@ def public_dir(obj, underscores=1):
     underscores *= '_'
     return [f for f in dir(obj) if not f.startswith(underscores)]
 
-def random_tickers(length, n, ends_in=None):
+
+def random_tickers(length, n, ends_in=None, letters=None):
     """Generate a length-n list of random ticker symbols.
 
     Parameters
@@ -500,8 +539,11 @@ def random_tickers(length, n, ends_in=None):
         the length of each ticker string
     n : int
         number of tickers to generate
-    ends_in : str, default None
+    endsin : str, default None
         specify the final element(s) of each ticker (for example, 'X')
+    letters : list or set, default None
+        Container of possible letters to choose from.  If None, defaults to
+        `string.ascii_uppercase`
 
     Examples
     ========
@@ -512,30 +554,29 @@ def random_tickers(length, n, ends_in=None):
     ['OLHZP', 'MCAAJ', 'JMKFD', 'FFSCH']
     """
 
-    letters = list(string.ascii_uppercase)
+    if letters is None:
+        letters = string.ascii_uppercase
+    if endsin:
+        length = length - len(endsin)
+    res = random.sample(list(
+              itertools.combinations_with_replacement(letters, length)), n)
+    res = [''.join(i) for i in res]
+    if endsin:
+        res = [r + endsin for r in res]
 
-    if ends_in is None:
-        tickers = np.random.choice(letters, size=(n, length)).tolist()
-        tickers = [''.join(inner) for inner in tickers]
+    return res
 
-    else:
-        tickers = np.random.choice(letters, size=(n, length-1)).tolist()
-        tickers = [''.join(inner) for inner in tickers]
-        tickers = [ticker + ends_in for ticker in tickers]
-
-    # TODO: check for dupes, delete, and add new
-
-    return tickers
 
 def random_weights(size, sumto=1.):
     """Generate a np.array of `n` random weights that sum to `sumto`.
 
-    Note that sum is subject to typical Python floating point limitations.
+    Note that sumto is subject to typical Python floating point limitations.
     """
 
     w = np.random.random(size)
     w = sumto * w.T / np.sum(w.T, axis=0)
     return w.T
+
 
 def rolling_windows(a, window):
     """Creates rolling-window 'blocks' of length `window` from `a`.
@@ -544,6 +585,7 @@ def rolling_windows(a, window):
 
     Example
     =======
+    import numpy as np
     onedim = np.arange(20)
     twodim = onedim.reshape((5,4))
 
@@ -584,33 +626,7 @@ def rolling_windows(a, window):
     windows = np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
     return np.squeeze(windows)
 
+
 def view(df, row=10, col=5):
     """Abbreviated view similar to .head, but limit both rows & columns."""
     return df.iloc[:row, :col]
-
-# Text to digit translation used in `constrain_horizon`
-_num_to_dec = {
-    'zero': 0,
-    'one': 1,
-    'two': 2,
-    'three': 3,
-    'four': 4,
-    'five': 5,
-    'six': 6,
-    'seven': 7,
-    'eight': 8,
-    'nine': 9,
-    'ten': 10,
-    'eleven': 11,
-    'twelve': 12,
-    'thirteen': 13,
-    'fourteen': 14,
-    'fifteen': 15,
-    'sixteen': 16,
-    'seventeen': 17,
-    'eighteen': 18,
-    'nineteen': 19,
-    'twenty': 20,
-    'twenty four': 24,
-    'thirty six': 36,
-    }

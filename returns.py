@@ -140,10 +140,10 @@ dtype: float64
 """
 
 # TODO: the main shortcoming of this module is that it only supports a
-# 1-benchmark case.  (Using >1 securities with >1 benchmarks would require
-# taking a cartesian product of the two sets.  It's doable (the result could
-# could be a DataFrame with MultiIndex columns), but the module wasn't designed
-# as such to start
+#     1-benchmark case.  (Using >1 securities with >1 benchmarks would require
+#     taking a cartesian product of the two sets.)  It's doable (the result 
+#     could be a DataFrame with MultiIndex columns), but the module wasn't 
+#     designed as such to start.
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
@@ -257,6 +257,7 @@ _defaultdocs = {
         use pickled data or refresh"""
     }
 
+
 # `prep`: uses `.pipe` to chain together several convenience functions
 # -----------------------------------------------------------------------------
 
@@ -306,6 +307,7 @@ def prep(r, freq=None, name=None, in_format='num'):
              .pipe(num_to_dec, in_format=in_format)
              .pipe(series_to_frame, name=name)
            )
+
 
 # Funcs to be called by `pipe` for 'prepping' return streams to uniform format
 # -----------------------------------------------------------------------------
@@ -362,9 +364,10 @@ def check_format(r, in_format='num'):
                       RuntimeWarning)
     return r.copy()
 
+
 # Handful of elementary functions related to compounding.
-# NumPy functions are used wherever possible for compatability with both
-# numpy.ndarrays and pandas Series/DataFrames, and for speed
+#     NumPy functions are used wherever possible for compatability with both
+#     numpy.ndarrays and pandas Series/DataFrames.
 # ----------------------------------------------------------------------------
 
 @utils.appender(_defaultdocs)
@@ -413,7 +416,7 @@ def cumulative_return(r, anlz=True, method='arithmetic', log=False):
     =======
 
         anlz        method                  result
-        =======     =======                 ======
+        ----        ------                  ------
         False       ('cum', 'cumulative')   Un-anlzd cumulative return
         False       ('geo', 'geometric')    Un-anlzd geometric mean return
         False       ('arith', 'arithmetic') Un-anlzd arithmetic mean return
@@ -423,8 +426,9 @@ def cumulative_return(r, anlz=True, method='arithmetic', log=False):
     """
 
     # TODO: this func needs cleaned up conceptually.  Does it really make sense
-    #    to multiply geometric returns?  log=True should probably necessitate
-    #    method='arithmetic' (don't they go hand-in-hand?).
+    #     to multiply geometric returns?  (not log-relative-geometric).  Some
+    #     param combinations should be explicitly forbidden.  log=True should 
+    #     probably necessitate method='arithmetic'.
 
     if log:
         res = np.add(np.sum(return_relatives(r, log=log)), 1.)
@@ -466,8 +470,9 @@ def drawdown_index(r, log=False):
     cummax = np.maximum.accumulate
     return np.subtract(np.divide(ri, cummax(ri)), 1.)
 
+
 # Variance, standard deviation, correlation, covariance, and other stats
-# derived primarily from moments of distribution
+#     derived primarily from moments of distribution.
 # ----------------------------------------------------------------------------
 
 @utils.appender(_defaultdocs)
@@ -500,7 +505,9 @@ def cond_correl(r, benchmark, ddof=1):
     would be the corr(`r`, `benchmark`) | `benchmark` <= mu - 2 * sigma.
     """
 
-    # TODO: rolling?
+    # TODO: rolling?  Could be either the average of rolling periods
+    #     (preserving the underlying periodicity) or first rolled up then
+    #     matrix calc'd.
 
     sigma = stdev(benchmark, anlz=False, ddof=ddof)[0]
     mu = benchmark.mean()[0] # TODO: geometric mean?
@@ -511,26 +518,24 @@ def cond_correl(r, benchmark, ddof=1):
     labels = ['[-inf,-2]', '(-2,-1]', '(-1,1]', '(1,2]', '(2,inf]']
     groups = pd.cut(benchmark.iloc[:, 0], bins=breakpoints, labels=labels)
 
-    # TODO: could be improved upon
-    # ValueError:
-    # a.groupby(groups).corrwith(b.groupby(groups))
+    # TODO: kludgy
     full = r.join(benchmark)
     corrs = (full.groupby(groups.values)
-             .corr()
-             .loc[(slice(None), r.columns), benchmark.columns[0]]
-             .unstack()
-             .T)
+                 .corr()
+                 .loc[(slice(None), r.columns), benchmark.columns[0]]
+                 .unstack()
+                 .T)
+
     return corrs
 
-
+@utils.appender(_defaultdocs)
 def cross_corr(r, window=None):
     """Average pairwise cross-correlation.
 
-    If window is None, returns a scalar.
-    Otherwise, returns a Series.
+    If window is None, returns a scalar.  Otherwise, returns a Series.
     """
 
-    # TODO: drop na ops (front and back side of function)
+    # TODO: Drop NaN ops (front and back side of function)
     if isinstance(r, np.ndarray):
         r = DataFrame(r)
     if window:
@@ -595,8 +600,9 @@ def jarque_bera(r, normal_kurtosis=0.0):
         raise ValueError('`normal_kurtosis` should be one of `0` or `3`')
     return Series(jb, index=r.columns, name='jarque_bera')
 
-# Core return analysis functions
-# Grouped here (1) in order of dependency and then (2) alphabetically
+
+# Core return analysis functions.
+# Grouped here (1) in order of dependency and then (2) alphabetically.
 # ----------------------------------------------------------------------------
 
 @utils.appender(_defaultdocs)
@@ -627,9 +633,10 @@ def sharpe_ratio(r, anlz=True, ddof=1, rf=None, method='geometric',
     standard deviation.
     """
 
-    # TODO: automatic de-annualization for periods <1 yr
-    # (but maybe you want to keep this manual)
-    # TODO: rolling
+    # TODO: 
+    # - Automatic de-annualization for periods <1 yr
+    #       (but maybe you want to keep this manual).
+    # - Rolling
 
     freq = r.index.freq.freqstr
     ri = cumulative_return(r, method=method, anlz=anlz)
@@ -772,9 +779,9 @@ def calmar_ratio(r, anlz=True, log=False):
     calmar_ratio = compounded anlzd return / abs(max drawdown)
     """
 
-    # TODO: clean up args
+    # TODO: clean up params
     return cumulative_return(r, anlz=anlz) \
-         / np.abs(max_drawdown(r, log=log, full_stats=False))
+               / np.abs(max_drawdown(r, log=log, full_stats=False))
 
 
 @utils.appender(_defaultdocs)
@@ -1065,6 +1072,7 @@ def batting_avg(r, benchmark, window=None, log=False, anlz=True, **kwargs):
                         anlz=anlz, **vargs)
     return er[er >= thresh].notnull().count() / er.notnull().count()
 
+
 # Up/down statistics
 # -----------------------------------------------------------------------------
 
@@ -1243,6 +1251,7 @@ def capture_ratio(r, benchmark, anlz=False, method='geometric', log=False,
 
     return uc / dc
 
+
 # Other utility funcs
 # -----------------------------------------------------------------------------
 
@@ -1390,10 +1399,6 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         Passed to `pyfinance.datasets.load_factors` if factors is not None
     pickle_to : str or None, default None
         Passed to `pyfinance.datasets.load_factors` if factors is not None
-
-    Example
-    =======
-    # TODO
     """
 
     # TODO:
@@ -1541,7 +1546,7 @@ class Portfolio(object):
         else:
             res = np.sum(res * weights)
         if anlz:
-            # TODO: arithmetic or geometric?
+            # TODO: arithmetic/geometric?
             res *= self._n
 
         return res
@@ -1582,6 +1587,7 @@ class Portfolio(object):
         return res
 
     def gmvp(self):
+        """Global minimum-variance portfolio."""
         cons = ({'type' : 'eq',
                  'fun' : lambda x: np.sum(x) - self.max_exposure})
         bnds = tuple((0, 1) for _ in range(self.noa))
@@ -1595,14 +1601,14 @@ class Portfolio(object):
         rw = utils.random_weights(size=(trials, self.noa))
         pvols = self.stdev(weights=rw)
         prets = self.expected_return(weights=rw)
-        # TODO: anlz
+        # TODO: annualize
 
         return pvols, prets
 
     @lru_cache(maxsize=None)
     def frontier(self, n_portfolios=50):
 
-        # TODO: ANNUALIZATION!
+        # TODO: annualize
 
         n_portfolios = int(n_portfolios)
 
@@ -1658,7 +1664,7 @@ class Portfolio(object):
         return 2.0 * c
 
     def value_at_risk(self, r, n=21, method='analytic', normdist=False,
-                      bestfit=True, dist=None, nboot=1e4, c=[0.99, 0.95, 0.90],
+                      bestfit=True, dist=None, nboot=1e4, c=None, 
                       weights=None):
 
         com = self.com
@@ -1666,13 +1672,16 @@ class Portfolio(object):
         halflife = self.halflife
         alpha = self.alpha
 
+        if c is None:
+            c = [0.99, 0.95, 0.90]
         c = np.array(c)
         a = 1. - c
 
         # TODO: non-portfolio (security-by-security) implementation
         port = self.portfolio(weights=weights)
 
-        # Validate that only 1/3 params below is not False or not None
+        # Validate that only 1/3 params below is not False or not None.
+        #     (Probably simpler: np.count_nonzero, but be explicit).
         distparams = [normdist, bestfit, dist]
         nonnull = distparams.count(False) + distparams.count(None)
         if nonnull < 2:

@@ -2,13 +2,15 @@
 
 Descriptions
 ============
-#TODO
+# TODO
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
-__all__ = ['BSM', 'Call', 'Put', 'OpStrat', 'Straddle', 'BullSpread',
-           'BearSpread', 'LongButterfly', 'ShortButterfly']
+__all__ = [
+    'BSM', 'Call', 'Put', 'OpStrat', 'Straddle', 'BullSpread',
+    'BearSpread', 'LongButterfly', 'ShortButterfly'
+    ]
 
 from collections import OrderedDict
 
@@ -42,7 +44,7 @@ class BSM(object):
     Resources
     =========
     Thomas Ho Company Ltd: Financial Models
-      http://www.thomasho.com/mainpages/?analysoln    
+      http://www.thomasho.com/mainpages/?analysoln
 
     Example
     =======
@@ -52,7 +54,7 @@ class BSM(object):
     Option(kind=call, S0=100.00, K=100.00, T=1.00, r=0.04, sigma=0.20)
 
     op.summary()
-    Out[89]: 
+    Out[89]:
     OrderedDict([('Value', 9.9250537172744373),
                  ('d1', 0.29999999999999999),
                  ('d2', 0.099999999999999978),
@@ -70,7 +72,7 @@ class BSM(object):
     [ 9.92505372  9.41590973  8.92571336  8.4543027   8.00147434  7.56698592
       7.15055895  6.75188165  6.37061188  6.00638013]
 
-    ops = Option(S0=np.arange(100, 110), K=np.arange(100, 110), T=1, r=.04, 
+    ops = Option(S0=np.arange(100, 110), K=np.arange(100, 110), T=1, r=.04,
                  sigma=.2)
 
     print(ops.value())
@@ -79,7 +81,7 @@ class BSM(object):
     """
 
     def __init__(self, S0, K, T, r, sigma, kind='call'):
-        kind = kind.lower()        
+        kind = kind.lower()
         if kind not in ['call', 'put']:
             raise ValueError("`kind` must be in ('call', 'put')")
 
@@ -110,22 +112,22 @@ class BSM(object):
     def __repr__(self):
         return ('BSM(kind={0}, S0={1:0.2f}, K={2:0.2f}, '
                 'T={3:0.2f}, r={4:0.2f}, sigma={5:0.2f})'
-                .format(self.kind, self.S0, self.K, 
+                .format(self.kind, self.S0, self.K,
                  self.T, self.r, self.sigma))
 
     def value(self):
         """Compute option value."""
         return self._sign[1] * self.S0 \
-               * norm.cdf(self._sign[1] * self.d1, 0.0, 1.0) \
-               - self._sign[1] * self.K * np.exp(-self.r * self.T) \
-               * norm.cdf(self._sign[1] * self.d2, 0.0, 1.0)
+                   * norm.cdf(self._sign[1] * self.d1, 0.0, 1.0) \
+                   - self._sign[1] * self.K * np.exp(-self.r * self.T) \
+                   * norm.cdf(self._sign[1] * self.d2, 0.0, 1.0)
 
     def delta(self):
         return norm.cdf(self.d1, 0.0, 1.0) + self._sign[0]
 
     def gamma(self):
         return (norm.pdf(self.d1, 0.0, 1.0)
-               / (self.S0 * self.sigma * np.sqrt(self.T)))
+                   / (self.S0 * self.sigma * np.sqrt(self.T)))
 
     def vega(self):
         return self.S0 * norm.pdf(self.d1, 0.0, 1.0) * np.sqrt(self.T)
@@ -139,16 +141,17 @@ class BSM(object):
 
     def rho(self):
         return (self._sign[1] * self.K * self.T * np.exp(-self.r * self.T)
-               * norm.cdf(self._sign[1] * self.d2, 0.0, 1.0))
+                   * norm.cdf(self._sign[1] * self.d2, 0.0, 1.0))
 
     def omega(self):
         return ((norm.cdf(self.d1, 0.0, 1.0) + self._sign[0])
-               * self.S0 / self.value())
+                   * self.S0 / self.value())
 
     def implied_vol(self, value, iter=100):
         """Get implied vol at the specified price.  Iterative approach."""
         vol = 0.4
         precision = 1.0e-5
+        # TODO: itertools.repeat
         for _ in range(iter):
             opt = BSM(S0=self.S0, K=self.K, T=self.T, r=self.r, sigma=vol,
                       kind=self.kind)
@@ -156,10 +159,11 @@ class BSM(object):
             if abs(diff) < precision:
                 return vol
             vol = vol + diff / opt.vega()
+
         return vol
 
     def summary(self, name=None):
-        res = OrderedDict([('Value', self.value()), 
+        res = OrderedDict([('Value', self.value()),
                            ('d1', self.d1),
                            ('d2', self.d2),
                            ('Delta', self.delta()),
@@ -169,6 +173,7 @@ class BSM(object):
                            ('Rho', self.rho()),
                            ('Omega', self.omega())
                           ])
+
         return res
 
 # Put & call: the building blocks of all other options strategies
@@ -178,36 +183,43 @@ _sign = {'long' : 1., 'Long' : 1., 'l' : 1., 'L' : 1.,
          'short' : -1., 'Short' : -1., 's' : -1., 'S' : -1.}
 
 class Call(object):
+
     def __init__(self, K=None, price=None, St=None, pos='long'):
         self.kind = 'call'
         self.K = K
         self.price = price
         self.St = St
         self.pos = pos
+
     def payoff(self, St=None):
         St = self.St if St is None else St
         return _sign[self.pos] * np.maximum(0., St - self.K)
+
     def profit(self, St=None):
         St = self.St if St is None else St
         return self.payoff(St=St) - _sign[self.pos] * self.price
+
     def __repr__(self):
         return ('Call(K={0:0.2f}, price={1:0.2f}, St={2:0.2f})'
                 .format(self.K, self.price, self.St))
-        # TODO: pos
 
 class Put(object):
+
     def __init__(self, K=None, price=None, St=None, pos='long'):
         self.kind = 'put'
         self.K = K
         self.price = price
         self.St = St
         self.pos = pos
+
     def payoff(self, St=None):
         St = self.St if St is None else St
         return _sign[self.pos] * np.maximum(0., self.K - St)
+
     def profit(self, St=None):
         St = self.St if St is None else St
         return self.payoff(St=St) - _sign[self.pos] * self.price
+
     def __repr__(self):
         return ('Put(K={0:0.2f}, price={1:0.2f}, St={2:0.2f})'
                 .format(self.K, self.price, self.St))
@@ -232,7 +244,7 @@ class OpStrat(object):
 
     def summary(self, St=None):
         St = self.St if St is None else St
-        if self.options:            
+        if self.options:
             payoffs = [op.payoff(St=St) for op in self.options]
             profits = [op.profit(St=St) for op in self.options]
             strikes = [op.K for op in self.options]
@@ -248,19 +260,19 @@ class OpStrat(object):
                                ('payoff', payoffs),
                                ('profit', profits),
                               ])
-            return DataFrame(res)                      
+
+            return DataFrame(res)
+
         else:
             return None
 
     def payoff(self, St=None):
         return np.sum([op.payoff(St=St) for op in self.options], axis=0)
-        # TODO: add St here.  This is essential.
 
     def profit(self, St=None):
         return np.sum([op.profit(St=St) for op in self.options], axis=0)
 
     def diagram(self, start=None, stop=None, St=None, **kwargs):
-
         # Case 1: start=None, stop=None, St=None, self.St=None -> ValueError
         # Case 2: start=None, stop=None, St=None, self.St not None ->
         #         St = self.St, 0.9/1.1 bound start/stop
@@ -270,7 +282,7 @@ class OpStrat(object):
             raise ValueError('must specify one of (`start`, `stop`, `St`).'
                              ' `St` is midpoint of x-axis')
         elif not any((start, stop)):
-            St = self.St if St is None else St           
+            St = self.St if St is None else St
             start = np.max(St) * 0.9
             stop = np.max(St) * 1.1
 
@@ -295,12 +307,12 @@ class Straddle(OpStrat):
 class Strangle(OpStrat):
     """A lower cost alternative to a straddle.
 
-    The investor purchases a long call and a long put on the same underlying 
-    security with the same expiration but where the put strike price is lower 
+    The investor purchases a long call and a long put on the same underlying
+    security with the same expiration but where the put strike price is lower
     than the call strike price.
     """
 
-    def __init__(self, St=None, K1=None, K2=None, callprice=None, 
+    def __init__(self, St=None, K1=None, K2=None, callprice=None,
                  putprice=None):
         OpStrat.__init__(self, St=St)
 
@@ -313,7 +325,7 @@ class Strangle(OpStrat):
         self.add_option(K=K2, price=putprice, St=St, kind='put')
 
 class BullSpread(OpStrat):
-    def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None, 
+    def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None,
                  kind='call'):
         OpStrat.__init__(self, St=St)
 
@@ -328,13 +340,13 @@ class BearSpread(OpStrat):
     """
     Example
     =======
-    b = BearSpread(St=np.array([1900, 2000, 2100]), K1=1950, K2=2050, 
+    b = BearSpread(St=np.array([1900, 2000, 2100]), K1=1950, K2=2050,
                    price1=56.01, price2=107.39)
     print(b.profit())
     [ 48.62  -1.38 -51.38]
     """
 
-    def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None, 
+    def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None,
                  kind='put'):
         OpStrat.__init__(self, St=St)
 
@@ -349,10 +361,10 @@ class BearSpread(OpStrat):
 class LongButterfly(OpStrat):
     """A (long) butterfly spread.
 
-    Consists of all calls or puts and is established by purchasing the low 
-    strike price, selling 2 at a middle strike price, and then buying the 
-    highest strike price. The low and high strikes are equidistant from the 
-    middle strike. Used by people who feel the underlying will trade in a 
+    Consists of all calls or puts and is established by purchasing the low
+    strike price, selling 2 at a middle strike price, and then buying the
+    highest strike price. The low and high strikes are equidistant from the
+    middle strike. Used by people who feel the underlying will trade in a
     narrow range.
     """
 
@@ -361,7 +373,7 @@ class LongButterfly(OpStrat):
     def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
                  price2=None, price3=None, kind='call'):
         OpStrat.__init__(self, St=St)
-        
+
         self.K1 = K1
         self.K2 = K2
         self.K3 = K3
@@ -379,7 +391,7 @@ class ShortButterfly(OpStrat):
     def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
                  price2=None, price3=None, kind='call'):
         OpStrat.__init__(self, St=St)
-        
+
         self.K1 = K1
         self.K2 = K2
         self.K3 = K3

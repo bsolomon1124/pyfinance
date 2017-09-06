@@ -2,13 +2,30 @@
 
 Descriptions
 ============
-# TODO
+load_13f
+    Parse SEC 13F XML file to pandas DataFrame.
+load_activeshare
+    Reconstruct active share database from activeshare.info.
+load_factors
+    Load risk factor returns.
+load_industries
+    Load industry portfolio returns from Ken French's website.
+load_rates
+    Load database of interest rates (CP, corporate, government).
+load_rf
+    Build a risk-free rate return series using 3-month US T-bill yields.
+scrub_activeshare
+    Scrub active share data from activeshare.info for a given ticker or id.
+load_retaildata
+    Load and clean retail trade data from census.gov.
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
-__all__ = ['load_factors', 'load_industries', 'load_rates', 'load_shiller',
-           'load_activeshare', 'scrub_activeshare', 'load_rf']
+__all__ = [
+    'load_factors', 'load_industries', 'load_rates', 'load_shiller',
+    'load_activeshare', 'scrub_activeshare', 'load_rf'
+    ]
 
 from collections import defaultdict
 import itertools
@@ -16,7 +33,7 @@ import re
 import time
 try:
    import cPickle as pickle
-except:
+except (ModuleNotFoundError, ImportError):
    import pickle
 
 from bs4 import BeautifulSoup
@@ -28,21 +45,92 @@ from pandas_datareader.data import DataReader as dr
 import requests
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+import xmltodict
 
 from pyfinance import returns, utils
 
 # Default start date for web-retrieved time series
 DSTART = '1950-01'
 
+def load_13f(url=None, CIK=None):
+    """Parse SEC 13F XML file to pandas DataFrame.
+
+    Use the raw .xml file rather than formatted table form as url.  Providing
+    a CIK will be slower than direct URL.  CIK will find the most recent
+    submission.
+
+    Parameters
+    ==========
+    url : str, default None.  Use raw .xml file rather than formatted table
+        Link to .xml file
+    CIK : int, default None
+        Firm CIK number.  Will find the most recent submission
+
+    Returns
+    =======
+    df : DataFrame
+        holdings snapshot
+
+    Example
+    =======
+    url = 'https://www.sec.gov/Archives/edgar/data/1040273/000108514617001787/form13fInfoTable.xml'
+    res = load_13f(url=url)
+
+    Note
+    ====
+    URL structure: in 000110380417000040 (example):
+        - 0001103804 is the CIK (000 added)
+        - 17 is the year
+        - 000040 is 'a sequential count of submitted filings from that CIK.
+          The count  is usually, but not always, reset to 0 at the start of
+          each calendar year.'
+
+    See https://www.sec.gov/edgar/searchedgar/accessing-edgar-data.htm
+    """
+
+    if np.count_nonzero([url, CIK]) != 1:
+        raise ValueError('One of url or CIK must be specified, but not both.')
+    if CIK:
+        url = _direc(CIK)
+
+    data = requests.get(url).text
+    df = DataFrame(xmltodict.parse(data)['informationTable']['infoTable'])
+    df = pd.concat((df, df.votingAuthority.apply(pd.Series),
+                    df.shrsOrPrnAmt.apply(pd.Series)), axis=1)
+    del df['votingAuthority'], df['shrsOrPrnAmt']
+    nums = ['value', 'Sole', 'sshPrnamt']
+    df.loc[:, nums] = df.loc[:, nums].apply(pd.to_numeric)
+    df.loc[:, 'weight'] = df.value / df.value.sum()
+
+    return df
+
+
+def _direc(CIK):
+    direc = 'https://www.sec.gov/Archives/edgar/data/' + str(CIK)
+    r = requests.get(direc)
+    soup = BeautifulSoup(r.text, 'html.parser')
+    folders = [link.get('href') for link in soup.find_all('a')]
+    folders = list(filter(lambda k: '/Archives' in k, folders))
+
+    for folder in folders:
+        link = 'https://www.sec.gov' + folder
+        r = requests.get(link)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        link = [link.get('href') for link in soup.find_all('a')
+                if 'Form13fInfoTable.xml' in link]
+        if link:
+            break
+
+    return 'https://www.sec.gov' + link[0]
+
+
 def load_activeshare():
-    """Reconstructed active share database from activeshare.info."""
+    """Reconstruct active share database from activeshare.info."""
 
     # TODO: There are 3560 funds in database as of last run, but this will
-    # be error-prone as number of funds change.  Convert to while loop
+    #     be error-prone as number of funds change.  Convert to while loop
 
-    # TODO: Generally sloppy code, could used cleaned up before next run
-
-    def get_actsh(start=1, end=3560):
+    def _get_actsh(start=1, end=3560):
         info = defaultdict(list)
         data = []
         errors = []
@@ -58,9 +146,10 @@ def load_activeshare():
                 errors.append(fundid)
         info = pd.DataFrame.from_dict(info)
         data = pd.concat(data, axis=0)
+
         return info, data, errors
 
-    info, data, _ = get_actsh() # return errors if needed
+    info, data, _ = _get_actsh() # return errors if needed
     data.index = data.index.to_timestamp(freq='Q', how='end')
     data.replace('', np.nan, inplace=True)
     info.replace('', np.nan, inplace=True)
@@ -147,27 +236,20 @@ def load_activeshare():
 
     grp1 = merged.groupby(['Date', 'Ctgry'])
     grp2 = merged.groupby(['Date', 'Ctgry'])
-
     rank1 = grp1['Minimum Active Share (Across Benchmarks)'].rank(pct=True)
     rank2 = grp2['Minimum Active Share (Across Benchmarks)'].rank(pct=True)
-
-    rank = np.where(merged.minbenchmarks.isnull() & merged.sdbenchmarks.isnull(),
-                    np.nan,
-                    np.where(merged.minbenchmarks.isnull(), rank2, rank1))
+    cond1 = merged.minbenchmarks.isnull()
+    cond2 = merged.sdbenchmarks.isnull()
+    rank = np.where(cond1 & cond2, np.nan,
+                    np.where(cond1, rank2, rank1))
     merged['Rank'] = rank
-
-    # merged.to_csv('output/merged.csv')
-
-    # Helper function for querying
-    # def query(df, ticker):
-        # return df[df.Tickers.str.contains(ticker).fillna(False)]
 
     return merged
 
 
 @utils.pickle_option
 def load_factors(pickle_from=None, pickle_to=None):
-    """Load factor returns.
+    """Load risk factor returns.
 
     Factors
     =======
@@ -190,7 +272,7 @@ def load_factors(pickle_from=None, pickle_to=None):
     DP          Dividend-to-price                                      French
     BAB         Betting against beta                                   AQR
     QMJ         Quality minus junk                                     AQR
-    HMLD        Value (high minus low) ["Devil" version]               AQR
+    HMLD        Value (high minus low) [modified version]              AQR
     LIQ         Liquidity                                              Pastor
     BDLB        Bond lookback straddle                                 Hsieh
     FXLB        Curency lookback straddle                              Hsieh
@@ -296,7 +378,7 @@ def load_factors(pickle_from=None, pickle_to=None):
 
     put1 = (read_excel(link1, index_col=0, skiprows=6, header=None)
                .rename_axis('DATE'))
-    put2 = read_csv(link2, index_col=0, parse_dates=True, skiprows=7, 
+    put2 = read_csv(link2, index_col=0, parse_dates=True, skiprows=7,
                header=None).rename_axis('DATE')
     put = (pd.concat((put1, put2))
            .rename(columns={1 : 'PUT'})
@@ -310,9 +392,9 @@ def load_factors(pickle_from=None, pickle_to=None):
     link1 = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/bxmarchive.csv'
     link2 = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/bxmcurrent.csv'
 
-    bxm1 = read_csv(link1, index_col=0, parse_dates=True, skiprows=5, 
+    bxm1 = read_csv(link1, index_col=0, parse_dates=True, skiprows=5,
                header=None).rename_axis('DATE')
-    bxm2 = read_csv(link2, index_col=0, parse_dates=True, skiprows=4, 
+    bxm2 = read_csv(link2, index_col=0, parse_dates=True, skiprows=4,
                header=None).rename_axis('DATE')
     bxm = (pd.concat((bxm1, bxm2))
               .rename(columns={1 : 'BXM'})
@@ -324,7 +406,7 @@ def load_factors(pickle_from=None, pickle_to=None):
     tgt.append(bxm)
 
     link = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/rxm_historical.csv'
-    rxm = (read_csv(link, index_col=0, parse_dates=True, skiprows=2, 
+    rxm = (read_csv(link, index_col=0, parse_dates=True, skiprows=2,
               header=None)
               .rename(columns={1 : 'RXM'})
               .rename_axis('DATE')
@@ -482,7 +564,7 @@ def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
     """Build a risk-free rate return series using 3-month US T-bill yields.
 
     The 3-Month Treasury Bill: Secondary Market Rate from the Federal Reserve
-    (a yield) is convert to a total return.  See "Methodology" for details.
+    (a yield) is convert to a total return.  See 'Methodology' for details.
 
     The time series should closely mimic returns of the BofA Merrill Lynch US
     Treasury Bill (3M) (Local Total Return) index.
@@ -592,6 +674,7 @@ def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
 
     return res
 
+
 @utils.pickle_option
 def load_shiller(pickle_from=None, pickle_to=None):
     """Load data from Robert Shiller's website.
@@ -633,9 +716,9 @@ def load_shiller(pickle_from=None, pickle_to=None):
 def scrub_activeshare(ticker=None, fundid=None):
     """Scrub active share data from activeshare.info for a given ticker or id.
 
-    Specify *one* of {ticker, fundid}.  Specifying fundid will be exceptionally
-    faster, because using ticker routes through selenium and "clicks through"
-    the search bar with selenium.
+    Specify *one* of (`ticker`, `fundid`).  Specifying fundid will be exceptionally
+    faster, because using `ticker` routes through Selenium and remotely
+    navigates through the search bar with Selenium.
 
     Parameters
     ==========
@@ -753,6 +836,7 @@ def scrub_activeshare(ticker=None, fundid=None):
 
     return result
 
+
 @utils.pickle_option
 def load_retaildata(pickle_from=None, pickle_to=None):
     """Monthly retail trade data from census.gov."""
@@ -842,7 +926,8 @@ def load_retaildata(pickle_from=None, pickle_to=None):
     sales = DataFrame(dct)
     sales = sales.reindex(pd.date_range(sales.index[0],
                           sales.index[-1], freq='M'))
-    # TODO: account for any skipped months
-    # Could specify a DateOffset to `freq` param of pandas.DataFrame.shift
+    # TODO: account for any skipped months; could specify a DateOffset to
+    # `freq` param of `pandas.DataFrame.shift`
     yoy = sales.pct_change(periods=12)
+
     return sales, yoy

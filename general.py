@@ -2,16 +2,41 @@
 
 Descriptions
 ============
-# TODO
+activeshare
+    Compute the active ahare of a fund versus an index.
+amortize
+    Construct an amortization schedule for a fixed-rate loan.
+BestFitDist
+    Which continuous distribution best models `x`?
+corr_heatmap
+    Wrapper around seaborn.heatmap for visualizing correlation matrix.
+ewm_params
+    Return corresponding param. values for exponential weighted functions.
+ewm_weights
+    Exponential weights as a function of position `i`.
+ewm_bootstrap
+    Bootstrap a new distribution through exponential weighting.
+factor_loadings
+    Security factor exposures generated through OLS regression.
+PCA
+    Performs principal component analysis (PCA) on a set of returns.
+PortSim
+    Basic portfolio simulation.
+TEOpt
+    Tracking error optimization/security replication.
+variance_inflation_factor
+    Calculate variance inflation factor (VIF) for each all `regressors`.
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
-__all__ = ['activeshare', 'amortize', 'BestFitDist', 'corr_heatmap', 
-           'ewm_params', 'ewm_weights', 'ewm_bootstrap', 'factor_loadings', 'PCA', 'PortSim', 'TEOpt', 
-           'variance_inflation_factor']
+__all__ = [
+    'activeshare', 'amortize', 'BestFitDist', 'corr_heatmap',
+    'ewm_params', 'ewm_weights', 'ewm_bootstrap', 'factor_loadings', 'PCA',
+    'PortSim', 'TEOpt', 'variance_inflation_factor'
+    ]
 
-from collections import OrderedDict    
+from collections import OrderedDict
 import itertools
 import warnings
 
@@ -28,11 +53,11 @@ from sklearn.utils.extmath import svd_flip
 from pyfinance import datasets, ols, returns, utils
 
 def activeshare(fund, idx, in_format='num'):
-    """Computes the Active Share of a fund versus an index.
+    """Compute the active ahare of a fund versus an index.
 
     Formula is 0.5 * sum(abs(w_fund - w_idx)).
 
-    See Cremers & Petajisto -  "How Active Is Your Fund Manager?"  (2009)
+    See Cremers & Petajisto, 'How Active Is Your Fund Manager?', 2009
 
     Parameters
     ==========
@@ -101,7 +126,7 @@ def amortize(rate, nper, pv, freq='M'):
     357  5116.63 -1268.42    -28.78  3848.22
     358  3848.22 -1275.55    -21.65  2572.67
     359  2572.67 -1282.72    -14.47  1289.94
-    360  1289.94 -1289.94     -7.26    -0.00    
+    360  1289.94 -1289.94     -7.26    -0.00
     """
 
     freq = utils.convertfreq(freq)
@@ -113,7 +138,7 @@ def amortize(rate, nper, pv, freq='M'):
     principal = np.ppmt(rate, periods, nper, pv)
     interest = np.ipmt(rate, periods, nper, pv)
     pmt = np.pmt(rate, nper, pv)
-    
+
     def balance(pv, rate, nper, pmt):
         dfac = (1 + rate) ** nper
         return pv * dfac - pmt * (dfac - 1) / rate
@@ -122,10 +147,9 @@ def amortize(rate, nper, pv, freq='M'):
                      'prin' : principal,
                      'interest' : interest,
                      'end_bal' : balance(pv, rate, periods, -pmt)},
-                    index=periods)
-    cols = ['beg_bal', 'prin', 'interest', 'end_bal']
+                    index=periods)['beg_bal', 'prin', 'interest', 'end_bal']
 
-    return res[cols]
+    return res
 
 
 class BestFitDist(object):
@@ -157,7 +181,7 @@ class BestFitDist(object):
     name                     norm
     params    (4.88130759176, ...
     sse                 0.0015757
-    dtype: object    
+    dtype: object
 
     print(fitted.all())
             name      sse               params
@@ -212,8 +236,8 @@ class BestFitDist(object):
 
                 try:
                     # The generic rv_continuous.fit() returns `mle_tuple`:
-                    # "MLEs for any shape parameters (if applicable), followed
-                    # by those for location and scale"
+                    #    'MLEs for any shape parameters (if applicable),
+                    #    followed by those for location and scale.'
                     param = *shape, loc, scale = dist.fit(self.x)
 
                     pdf = dist.pdf(bin_edges, loc=loc, scale=scale, *shape)
@@ -229,7 +253,7 @@ class BestFitDist(object):
                         best_pdf = pdf
 
                 except (NotImplementedError, AttributeError):
-                    # TODO: what might you (validly) run into here?
+                    # TODO: what else might you (validly) run into here?
                     sses.append(np.nan)
                     params.append(np.nan)
 
@@ -255,9 +279,10 @@ class BestFitDist(object):
         """All tested distributions, their parameters, and SSEs."""
         res = DataFrame({'name' : self.distributions,
                          'params' : self.params,
-                         'sse' : self.sses})
-        return res[['name', 'sse', 'params']].sort_values(by=by, 
-                                                          ascending=ascending)
+                         'sse' : self.sses})[['name', 'sse', 'params']]
+        res.sort_values(by=by, ascending=ascending, inplace=True)
+
+        return res
 
     def plot(self):
         """Plot the empirical histogram versus best-fit distribution's PDF."""
@@ -265,13 +290,13 @@ class BestFitDist(object):
         plt.plot(self.bin_edges, self.best_pdf)
 
 
-def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1, 
+def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
                  linewidths=0.5, square=True, figsize=(10,10), **kwargs):
     """Wrapper around seaborn.heatmap for visualizing correlation matrix.
 
     Parameters
     ==========
-    x : DataFrame 
+    x : DataFrame
         Underlying data (not a correlation matrix)
     mask_half : bool, default True
         If True, mask (whiteout) the upper right triangle of the matrix
@@ -289,17 +314,17 @@ def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
     r = np.random.ranf(k ** 2).reshape((k, k)) * 5
     df = pd.DataFrame(np.random.multivariate_normal(mu, r, size=size))
 
-    corr_heatmap(df)    
+    corr_heatmap(df)
     """
-    
-    if mask_half:    
+
+    if mask_half:
         mask = np.zeros_like(x.corr().values)
         mask[np.triu_indices_from(mask)] = True
     else:
         mask = None
-    
+
     with sns.axes_style('white'):
-        return sns.heatmap(x.corr(), cmap=cmap, vmin=vmin, vmax=vmax, 
+        return sns.heatmap(x.corr(), cmap=cmap, vmin=vmin, vmax=vmax,
                     linewidths=linewidths, square=square, mask=mask, **kwargs)
 
 
@@ -326,6 +351,7 @@ def ewm_params(param, param_value):
         com = 1./a - 1.
         span = 2./a - 1.
         halflife = np.log(0.5)/np.log(1. - a)
+
         return {'com' : com, 'span' : span, 'halflife' : halflife}
 
     def output_alpha(param, p):
@@ -334,6 +360,7 @@ def ewm_params(param, param_value):
             'span' : 2./(p + 1.),
             'halflife' : 1. - np.exp(np.log(0.5)/p)
         }
+
         return eqs[param]
 
     if param == 'alpha':
@@ -350,6 +377,11 @@ def ewm_params(param, param_value):
 
 
 def ewm_weights(i, com=None, span=None, halflife=None, alpha=None):
+    """Exponential weights as a function of position `i`.
+
+    Mimics pandas' methodology with adjust=True:
+    http://pandas.pydata.org/pandas-docs/stable/computation.html#exponentially-weighted-windows
+    """
 
     if not any((com, span, halflife, alpha)):
         raise ValueError('specify one of `com`, `span`, `halflife`, `alpha`')
@@ -367,7 +399,7 @@ def ewm_weights(i, com=None, span=None, halflife=None, alpha=None):
     return res
 
 
-def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None, 
+def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
                   alpha=None):
     """Bootstrap a new distribution through exponential weighting.
 
@@ -395,7 +427,7 @@ def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
     # Our bootstrapped histogram should approximate these freqs
     print(ewm_weights(10, alpha=.10))
     [ 0.05948221  0.06609135  0.07343483  0.08159426  0.09066029  0.10073365
-      0.11192628  0.12436253  0.13818059  0.15353399]    
+      0.11192628  0.12436253  0.13818059  0.15353399]
 
     res = ewm_bootstrap(np.arange(10), size=int(1e6), alpha=.10)
     res = pd.Series(res).value_counts()
@@ -407,18 +439,18 @@ def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
     5    0.10113
     dtype: float64
     """
-    
+
     if not any((com, span, halflife, alpha)):
         raise ValueError('specify one of `com`, `span`, `halflife`, `alpha`')
 
-    p = ewm_weights(i=len(a), com=com, span=span, halflife=halflife, 
+    p = ewm_weights(i=len(a), com=com, span=span, halflife=halflife,
                     alpha=alpha)
     res = np.random.choice(a=a, size=size, p=p)
 
     return res
 
 
-def factor_loadings(r, factors=None, scale=False, pickle_from=None, 
+def factor_loadings(r, factors=None, scale=False, pickle_from=None,
                     pickle_to=None):
     """Security factor exposures generated through OLS regression.
 
@@ -431,12 +463,12 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         single-column DataFrame), the result will be a DataFrame.  If `r` is
         an nxm DataFrame, the result will be a dictionary of DataFrames.
     factors : DataFrame or None, default None
-        Factor returns (right-hand-side variables).  If None, factor returns 
+        Factor returns (right-hand-side variables).  If None, factor returns
         are loaded from `pyfinance.datasets.load_factors`
     scale : bool, default False
         If True, cale up/down the volatilities of all factors besides MKT & RF,
-        to the vol of MKT.  Both means and the standard deviations are 
-        multiplied by the scale factor (ratio of MKT.std() to other stdevs)  
+        to the vol of MKT.  Both means and the standard deviations are
+        multiplied by the scale factor (ratio of MKT.std() to other stdevs)
     pickle_from : str or None, default None
         Passed to `pyfinance.datasets.load_factors` if factors is not None
     pickle_to : str or None, default None
@@ -454,10 +486,10 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
     # - Add variance inflation factor to output (method of `ols.OLS`)
     # - Add 'missing=drop' functionality (see statsmodels.OLS)
     # - Take all combinations of factors; which has highest explanatory power
-    # or lowest SSE/MSE?
+    #       or lowest SSE/MSE?
 
     if factors is None:
-        factors = datasets.load_factors(pickle_from=pickle_from, 
+        factors = datasets.load_factors(pickle_from=pickle_from,
                                         pickle_to=pickle_to)
 
     r, factors = utils.constrain(r, factors)
@@ -475,15 +507,15 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
     if scale:
         # Scale up the volatilities of all factors besides MKT & RF, to the
         # vol of MKT.  Both means and the standard deviations are multiplied
-        # by the scale factor (ratio of MKT.std() to other stdevs)        
+        # by the scale factor (ratio of MKT.std() to other stdevs)
         tgtvol = factors['MKT'].std()
         diff = factors.columns.difference(['MKT', 'RF']) # don't scale these
         vols = factors[diff].std()
         factors.loc[:, diff] = factors[diff] * tgtvol / vols
 
     # Right-hand-side dict of models
-    rhs = OrderedDict([('Capital Asset Pricing Model (CAPM)', 
-                        ['MKT']),                    
+    rhs = OrderedDict([('Capital Asset Pricing Model (CAPM)',
+                        ['MKT']),
                        ('Fama-French 3-Factor Model',
                         ['MKT', 'SMB', 'HML']),
                        ('Carhart 4-Factor Model',
@@ -515,13 +547,13 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         for col in r:
             for k, v in rhs.items():
                 res = res.copy()
-                model = ols.OLS(y=r[col], x=factors[v], 
+                model = ols.OLS(y=r[col], x=factors[v],
                                           hasconst=False)
                 res.loc[(k, 'coef'), factors[v].columns] = model.beta()
                 res.loc[(k, 'tstat'), factors[v].columns] = model.tstat_beta()
                 res.loc[(k, 'coef'), 'alpha'] = model.alpha()
                 res.loc[(k, 'tstat'), 'alpha'] = model.tstat_alpha()
-                res.loc[(k, 'coef'), 'rsq_adj'] = model.rsq_adj()      
+                res.loc[(k, 'coef'), 'rsq_adj'] = model.rsq_adj()
             d[col] = res
         res = d
 
@@ -533,7 +565,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
             res.loc[(k, 'tstat'), factors[v].columns] = model.tstat_beta()
             res.loc[(k, 'coef'), 'alpha'] = model.alpha()
             res.loc[(k, 'tstat'), 'alpha'] = model.tstat_alpha()
-            res.loc[(k, 'coef'), 'rsq_adj'] = model.rsq_adj()            
+            res.loc[(k, 'coef'), 'rsq_adj'] = model.rsq_adj()
 
     return res
 
@@ -563,10 +595,10 @@ class PCA(object):
     =========
     Abdi & Williams, Principal Component Analysis, 2010
     Bro, Acar & Kolda, Resolving the Sign Ambiguity in the Singular Value
-      Decomposition, 2007
-    Mandel, Use of the Singular Value Decomposition in Regression Analysis, 1982
+        Decomposition, 2007
+    Mandel, Use of Singular Value Decomposition in Regression Analysis, 1982
     Rankin, Multi-Dimensional Diversification: Improving Portfolio Selection
-      Using Principal Component Analysis, 2016.
+        Using Principal Component Analysis, 2016
     """
 
     def __init__(self, m, threshold='Jolliffe'):
@@ -633,6 +665,7 @@ class PCA(object):
         self.inertia = (self.eigenvalues / self.eigenvalues.sum())[:self.keep]
         self.cumulative_inertia = self.inertia.cumsum()[:self.keep]
         self.eigenvalues = self.eigenvalues[:self.keep]
+
         return self
 
     @property
@@ -645,14 +678,15 @@ class PCA(object):
                           columns=['F%s' % i for i in
                                    range(1, self.keep + 1)],
                           index=idx)
+
         return table
 
     def loadings(self):
         """Loadings = eigenvectors times sqrt(eigenvalues)."""
         loadings = self.v[:, :self.keep] * np.sqrt(self.eigenvalues)
-        loadings = DataFrame(loadings, columns=['PC%s' % i for i in
-                                                     range(1,  self.keep + 1)],
-                          index=self.feature_names)
+        cols = ['PC%s' % i for i in range(1,  self.keep + 1)]
+        loadings = DataFrame(loadings, columns=cols, index=self.feature_names)
+
         return loadings
 
     @property
@@ -680,16 +714,17 @@ class PCA(object):
         for i in range(q):
             d_old = d
             lam = np.dot(loadings, r)
-            u, s, vh = np.linalg.svd(np.dot(loadings.T, np.asarray(lam) ** 3 
-                     - (gamma / p) 
-                     * np.dot(lam, 
+            u, s, vh = np.linalg.svd(np.dot(loadings.T, np.asarray(lam) ** 3
+                     - (gamma / p)
+                     * np.dot(lam,
                               np.diag(np.diag(np.dot(lam.T, lam))))))
             r = np.dot(u, vh)
             d = np.sum(s)
             if d / d_old < tol: break
 
-        return DataFrame(np.dot(loadings, r),
-                         columns=['PC%s' % i for i in range(1,  self.keep + 1)],
+        cols = ['PC%s' % i for i in range(1, self.keep + 1)]
+
+        return DataFrame(np.dot(loadings, r), columns=cols,
                          index=self.feature_names)
 
 
@@ -720,7 +755,7 @@ class PortSim(object):
         Keyword args dict passed to `constrain_horizon`.  See
         utils.constrain_horizon
     strict : bool, default False
-        Passed to `constrain_horizon`.  
+        Passed to `constrain_horizon`.
         If True, raise Error if the implied start date on the horizon predates
         the actual start date of `r`.  If False, just return `r` in this
         situation
@@ -739,16 +774,17 @@ class PortSim(object):
         `name` specifies the resulting column name; it is passed to
         `pd.Series.to_frame`; passed to returns.prep
     in_format : str, {'num', 'dec'}
-        Passed to returns.prep; converts percentage figures from 
+        Passed to returns.prep; converts percentage figures from
         numeral form to decimal form
     """
 
     def __init__(self, r, fee=0., fee_freq='Q', start=None, end=None,
-                 lookback={}, strict=False, dist_amt=None, dist_pct=None, 
-                 dist_freq=None, v0=float(1e6), include_start=True, freq='M', 
+                 lookback={}, strict=False, dist_amt=None, dist_pct=None,
+                 dist_freq=None, v0=float(1e6), include_start=True, freq='M',
                  name=None,  in_format='num'):
-        
-        self.gross = returns.prep(r=r, freq=freq, name=name, in_format=in_format)
+
+        self.gross = returns.prep(r=r, freq=freq, name=name,
+                                  in_format=in_format)
 
         # fee_freq: if str -> frequency; if int/float -> periods/yr
         # Get `fee` to a per-period float
@@ -784,7 +820,7 @@ class PortSim(object):
         # Net of fees (not yet of distributions)
         self.net = (1. + self.gross.values) \
                  * (1. - self.feesched.reshape(-1,1)) - 1.
-        self.net = DataFrame(self.net, index=self.index, columns=self.columns)   
+        self.net = DataFrame(self.net, index=self.index, columns=self.columns)
 
         self.dist_amt = dist_amt
         self.dist_pct = dist_pct
@@ -802,11 +838,10 @@ class PortSim(object):
                 res = returns.insert_start(res, base=self.v0)
 
         elif self.dist_pct is not None:
-            res = returns.return_index((1. + self.net) * (1. - self.dist_pct) - 1.,
-                              base=self.v0, include_start=self.include_start)        
-        return res      
+            res = returns.return_index((1.+self.net) * (1.-self.dist_pct) - 1.,
+                              base=self.v0, include_start=self.include_start)
 
-    # TODO: cumulative distributions, cumulative dollar fees
+        return res
 
 
 class TEOpt(object):
@@ -833,7 +868,7 @@ class TEOpt(object):
     """
 
     def __init__(self, r, proxies, window, sumto=1.):
-        
+
         self.r = r
         self.proxies = proxies
         self.window = int(window)
@@ -857,7 +892,7 @@ class TEOpt(object):
                 weights = np.array(weights)
             proxy = np.sum(proxies * weights, axis=1)
             te = np.std(proxy - r) # not anlzd...
-            return te        
+            return te
 
         ew = utils.equal_weights(n=self.n, sumto=self.sumto)
         bnds = tuple((0, 1) for x in range(self.n))
@@ -866,13 +901,14 @@ class TEOpt(object):
         xs = []
         funs = []
         for i, j in zip(self._r, self._proxies):
-            opt = sco.minimize(te, x0=ew, args=(i,j), method='SLSQP', 
+            opt = sco.minimize(te, x0=ew, args=(i,j), method='SLSQP',
                                bounds=bnds, constraints=cons)
-            x, fun  = opt['x'], opt['fun']            
+            x, fun  = opt['x'], opt['fun']
             xs.append(x)
             funs.append(fun)
         self._xs = np.array(xs)
         self._funs = np.array(funs)
+
         return self
 
     def opt_weights(self):
@@ -887,7 +923,7 @@ class TEOpt(object):
     def replicate(self):
         """Forward-month returns of the replicating portfolio."""
         return (np.sum(self.proxies[self.window:] * self._xs[:-1], axis=1)
-                .reindex(self.r.index))
+                   .reindex(self.r.index))
 
 
 def variance_inflation_factor(regressors, hasconst=False):
@@ -915,8 +951,8 @@ def variance_inflation_factor(regressors, hasconst=False):
     from datetime import date
     from pandas_datareader.data import DataReader as dr
 
-    syms = {'TWEXBMTH' : 'usd', 
-            'T10Y2YM' : 'term_spread', 
+    syms = {'TWEXBMTH' : 'usd',
+            'T10Y2YM' : 'term_spread',
             'PCOPPUSDM' : 'copper'
            }
     start = date(2000, 1, 1)
@@ -949,7 +985,7 @@ def variance_inflation_factor(regressors, hasconst=False):
 
     # Find the constant column (probably called 'const', but not necessarily
     # and drop it. `is_nonzero_const` borrowed from statsmodels.add_constant
-    is_nonzero_const = np.ptp(regressors.values, axis=0) == 0    
+    is_nonzero_const = np.ptp(regressors.values, axis=0) == 0
     is_nonzero_const &= np.all(regressors != 0.0, axis=0)
     vifs.drop(vifs.index[is_nonzero_const], inplace=True)
 

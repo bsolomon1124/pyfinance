@@ -42,13 +42,13 @@ class OLS(object):
         The y (dependent, response, endogenous) variable
     x : array-like (ndarray, Series, DataFrame) or None, default None
         The x (independent, explanatory, exogenous) variable.  If only `y`
-        is given (and `x=None`), `y` is assumed to be the first column of 
+        is given (and `x=None`), `y` is assumed to be the first column of
         `y` and `x` the remaining [1:] columns
     hasconst : bool, default False
         Specifies whether `x` includes a user-supplied constant (a column
         vector).  If False, it is added at instantiation
     names : dict, default None
-        User-specified names of the y and x variables.  If None, they will be 
+        User-specified names of the y and x variables.  If None, they will be
         inferred from the input data attributes (i.e. name of Series or columns
         of a DataFrame).  If not None, specify names with keys ('y', 'x')
 
@@ -68,10 +68,10 @@ class OLS(object):
         The endogenous data as np.array(n,)
     names : dict
         Variable names with keys ('x', 'y')
-    solution : 
+    solution :
         The returned `x` from np.linalg.lstsq
     """
-    
+
     # TODO: what about a case with >1 y vectors and > 1 x vectors?
 
     def __init__(self, y, x=None, hasconst=False, names=None):
@@ -92,33 +92,33 @@ class OLS(object):
         else:
             self.idx = np.arange(self.n)
 
-        # If only `y` is given (and `x=None`), `y` is assumed to be the first 
+        # If only `y` is given (and `x=None`), `y` is assumed to be the first
         # column of `y` and `x` the remaining [1:] columns
         if x is None:
             if isinstance(y, DataFrame):
-                self.names = {'y' : y.columns[0].tolist(), 
+                self.names = {'y' : y.columns[0].tolist(),
                               'x' : y.columns[1:].tolist()
                              }
                 x = y.iloc[:, 1:].values
                 y = y.iloc[:, 0 ].values
-            elif isinstance(y, np.ndarray):                 
+            elif isinstance(y, np.ndarray):
                 x = y[:, 1:]
                 y = y[:, 0 ]
-                self.names = {'y' : 'y', 'x' : ['var%s' % i for 
+                self.names = {'y' : 'y', 'x' : ['var%s' % i for
                                                 i in range(x.shape[1])]}
 
         # Case of ndarray with x not None
         elif isinstance(y, np.ndarray):
             if x.ndim == 1:
                 x = x.reshape(-1,1)
-            self.names = {'y' : 'y', 'x' : ['var%s' % i for 
+            self.names = {'y' : 'y', 'x' : ['var%s' % i for
                                             i in range(x.shape[1])]}
-            
+
         # Case of Series or DataFrame with x not None
-        else:                     
-            self.names = {'y' : y.name if isinstance(y, Series) else 
+        else:
+            self.names = {'y' : y.name if isinstance(y, Series) else
                                 y.columns.tolist(),
-                          'x' : x.name if isinstance(x, Series) else 
+                          'x' : x.name if isinstance(x, Series) else
                                 x.columns.tolist()}
             x = x.values
             y = y.values
@@ -140,7 +140,7 @@ class OLS(object):
 
         # np.lstsq(a,b): Solves the equation a x = b by computing a vector x
         self.solution = np.linalg.lstsq(self.x, self.y)[0]
-    
+
     def alpha(self):
         """The intercept term (alpha).
 
@@ -148,7 +148,7 @@ class OLS(object):
         """
 
         # TODO: with a single x term, this will return a 0d array
-        # such as array(1.2632862808026597); may not be ideal for rolling          
+        #     such as array(1.2632862808026597); may not be ideal for rolling.
         return np.squeeze(self.solution[0])
 
     def anova(self):
@@ -164,6 +164,7 @@ class OLS(object):
                  ('f', [self.fstat(), np.nan, np.nan]),
                  ('sig_f', [self.fstat_sig(), np.nan, np.nan])
                 ]
+
         return DataFrame(OrderedDict(stats), index=['reg', 'err', 'tot'])
 
     def beta(self):
@@ -174,6 +175,7 @@ class OLS(object):
         z = scs.t(self.df_err()).ppf(1. - a / 2.)
         b = self.solution.T
         se = self._se_all()
+
         # upper, lower
         return np.array([b - z * se, b + z * se])
 
@@ -181,6 +183,7 @@ class OLS(object):
         """Confidence interval for the intercept (alpha)."""
         ci = self._ci_all(a=a)
         ci = ci[:, 0] if ci.ndim == 2 else ci[:, :, 0]
+
         return ci
 
     def ci_beta(self, a=0.05):
@@ -191,19 +194,19 @@ class OLS(object):
         ci = self._ci_all(a=a)
         # TODO: may need to transpose
         # TODO: check for cases with k > 1
-        ci = ci[:, 1] if ci.ndim == 2 else ci[:, :, 1]      
+        ci = ci[:, 1] if ci.ndim == 2 else ci[:, :, 1]
         return ci
 
     def condition_number(self):
         """Condition number of x; ratio of largest to smallest eigenvalue."""
         x = np.matrix(self.x)
         ev = np.linalg.eig(x.T * x)[0]
-        return np.sqrt( ev.max() / ev.min() )
+        return np.sqrt(ev.max() / ev.min())
 
     def df_tot(self):
         """Total degrees of freedom, n - 1."""
         return self.n - 1.
-        
+
     def df_reg(self):
         """Model degrees of freedom. Equal to k."""
         return self.k
@@ -248,8 +251,8 @@ class OLS(object):
                  ('jb', self.jarque_bera()),
                  ('dw', self.durbin_watson()),
                  ('condno', self.condition_number())
-                ]                     
-        return Series(OrderedDict(stats))            
+                ]
+        return Series(OrderedDict(stats))
 
     def params(self):
         """Summary table for the parameters, incl. the intercept."""
@@ -258,8 +261,8 @@ class OLS(object):
         # fixes: dict of DataFrames?
         # or better, MultiIndex
         if self.y.ndim > 1:
-            raise RuntimeError('Method `params` is not supported for cases with'
-                               ' greater than one y variable.')
+            raise RuntimeError('Method `params` is not supported for cases'
+                               ' with greater than one y variable.')
         stats = [('coef', self.solution),
                  ('se', self._se_all()),
                  ('tstat', self._tstat_all()),
@@ -288,8 +291,8 @@ class OLS(object):
 
     def resids(self, full_output=False):
         if self.y.ndim > 1 and full_output:
-            raise RuntimeError('Method `resids` is not supported for cases with'
-                               ' greater than one y variable.')
+            raise RuntimeError('Method `resids` is not supported for cases'
+                               ' with greater than one y variable.')
         """The residuals (errors).
 
         Parameters
@@ -306,7 +309,7 @@ class OLS(object):
             return DataFrame(OrderedDict(resids), index=self.idx)
         else:
             return self.y - self.predicted()
-        
+
     def rsq(self):
         """The coefficent of determination, R-squared."""
         return self.ss_reg() / self.ss_tot()
@@ -323,12 +326,13 @@ class OLS(object):
         err = np.atleast_1d(self.ms_err())
         se = np.sqrt(np.diagonal(np.linalg.inv(x.T * x)) * err[:,np.newaxis])
         # Squeeze now rather than taking [:, i] later and creating
-        # single-element arrays
+        #     single-element arrays.
+
         return np.squeeze(se)
 
         # old
         # np.sqrt(np.diagonal(linalg.inv(x.T * x) * self.ms_err()))
-        # np.array([np.sqrt(np.diagonal(np.linalg.inv(x.T * x) 
+        # np.array([np.sqrt(np.diagonal(np.linalg.inv(x.T * x)
         #           * ols.ms_err()[i])) for i in range(ols.ms_err().shape[0])])
 
     def se_alpha(self):
@@ -341,8 +345,9 @@ class OLS(object):
         """Standard errors (SE) of the parameters, excluding the intercept."""
         se = self._se_all()
         # Keep these 2d for cases with 2+ y vectors, even in cases with just
-        # a single x vector.  Otherwise, can't distinguish what's what
+        #     a single x vector.  Otherwise, can't distinguish what's what.
         se_beta = se[1:] if se.ndim == 1 else se[:, 1:]
+
         return se_beta
 
     def ss_tot(self):
@@ -352,9 +357,9 @@ class OLS(object):
     def ss_reg(self):
         """Sum of squares of the regression."""
         return  np.sum(np.square(self.predicted() - self.ybar()), axis=0)
-        
+
     def ss_err(self):
-        """Sum of squares of the residuals (error sum of squares)."""     
+        """Sum of squares of the residuals (error sum of squares)."""
         return np.sum(np.square(self.resids()), axis=0)
 
     def std_err(self):
@@ -363,18 +368,19 @@ class OLS(object):
         For standard errors of parameters, see _se_all, se_alpha, and se_beta.
         """
 
-        return np.sqrt(np.sum(np.square(self.resids()), axis=0) / self.df_err())
-        
+        return np.sqrt(np.sum(np.square(self.resids()), 0) / self.df_err())
+
     def summary(self):
-        """Summary table of regression results.  An OrderedDict of subtables."""
+        """Summary table of regression results.  OrderedDict of subtables."""
         if self.y.ndim > 1:
-            raise RuntimeError('Method `summary` is not supported for cases' 
+            raise RuntimeError('Method `summary` is not supported for cases'
                                ' with greater than one y variable.')
         stats = [('overview', self.overview()),
                  ('anova', self.anova()),
                  ('params', self.params()),
                  ('resids', self.resids(full_output=True))
                 ]
+
         return OrderedDict(stats)
 
     def _tstat_all(self):
@@ -386,12 +392,14 @@ class OLS(object):
         t = self._tstat_all()
         # Same logic as with standard errors and other coefficient properties
         t = t[1:] if t.ndim == 1 else t[:, 1:]
+
         return t
 
     def tstat_alpha(self):
         """The t-statistic of the intercept (alpha)."""
         t = self._tstat_all()
         t = t[0] if t.ndim == 1 else t[:, 0]
+
         return t
 
     def ybar(self):
@@ -404,26 +412,26 @@ class RollingOLS(OLS):
     # TODO: docs
     def __init__(self, y, x=None, window=None, hasconst=False, names=None):
         OLS.__init__(self, y=y, x=x, hasconst=hasconst, names=names)
-            
+
         self.xwins = utils.rolling_windows(self.x, window=window)
         self.ywins = utils.rolling_windows(self.y, window=window)
 
         # TODO: iterator?
-        self.models = [OLS(y=ywin, x=xwin) for ywin, xwin 
+        self.models = [OLS(y=ywin, x=xwin) for ywin, xwin
                        in zip(self.ywins, self.xwins)]
 
     if window is None:
         raise ValueError('must specify `window`')
 
     def _rolling_stat(self, stat, **kwargs):
-        """Core generic method of the class."""
+        """Generic rolling attribute-getter."""
         stats = []
         for model in self.models:
-            # TODO: accept additional arguments
             s = getattr(model, stat)(**kwargs)
             stats.append(s)
+
         return np.array(stats)
-    
+
     def beta(self):
         return self._rolling_stat('beta')
 
@@ -458,10 +466,10 @@ class RollingOLS(OLS):
         return self._rolling_stat('rsq')
 
     def rsq_adj(self):
-        return self._rolling_stat('rsq_adj')        
+        return self._rolling_stat('rsq_adj')
 
     def tstat_alpha(self):
         return self._rolling_stat('tstat_alpha')
 
     def tstat_beta(self):
-        return self._rolling_stat('tstat_beta')        
+        return self._rolling_stat('tstat_beta')

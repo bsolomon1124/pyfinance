@@ -18,12 +18,12 @@ constrain
 constrain_horizon
     Constrain a Series/DataFrame to a specified lookback period.
 dropcols
-    Drop columns that contain NaN within [start, end] inclusive. 
+    Drop columns that contain NaN within [start, end] inclusive.
 encode
     One-hot encode the given input strings.
 equal_weights
     Generate `n` equal weights (decimals) summing to `sumto`.
-expanding_stdize 
+expanding_stdize
     Standardize a pandas object column-wise on expanding window.
 flatten
     Flatten a nested iterable.  Returns a generator object.
@@ -45,10 +45,12 @@ view
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
-__all__ = ['appender', 'avail', 'can_broadcast', 'convertfreq', 'constrain', 
-           'constrain_horizon', 'dropcols', 'encode', 'equal_weights',
-           'expanding_stdize', 'flatten', 'isiterable', 'public_dir',
-           'random_tickers', 'random_weights', 'rolling_windows', 'view']
+__all__ = [
+    'appender', 'avail', 'can_broadcast', 'convertfreq', 'constrain',
+    'constrain_horizon', 'dropcols', 'encode', 'equal_weights',
+    'expanding_stdize', 'flatten', 'isiterable', 'public_dir',
+    'random_tickers', 'random_weights', 'rolling_windows', 'view'
+    ]
 
 from functools import wraps
 import inspect
@@ -58,15 +60,13 @@ import string
 import textwrap
 try:
    import cPickle as pickle
-except:
+except (ModuleNotFoundError, ImportError):
    import pickle
 
 import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
 from pandas.tseries import offsets
-
-np.random.seed(123)
 
 def appender(defaultdocs, passed_to=None):
     """Decorator for appending commonly used parameter definitions.
@@ -81,13 +81,13 @@ def appender(defaultdocs, passed_to=None):
     =======
     ddocs = {
 
-        'a' : 
+        'a' :
         '''
         a : int, default 0
             the first parameter
         ''',
 
-        'b' : 
+        'b' :
         '''
         b : int, default 1
             the second parameter
@@ -102,7 +102,7 @@ def appender(defaultdocs, passed_to=None):
     """
 
     def _doc(func):
-        params = inspect.signature(func).parameters 
+        params = inspect.signature(func).parameters
         params = [param.name for param in params.values()]
         msg = '\n**kwargs : passed to `%s`'
         params = ''.join([textwrap.dedent(defaultdocs
@@ -148,7 +148,7 @@ def convertfreq(freq):
     4.0
 
     print(convertfreq('BQS-DEC'))
-    4.0    
+    4.0
     """
 
     freq = freq.upper()
@@ -166,7 +166,7 @@ def convertfreq(freq):
                + ['AS-%s' % m for m in months] \
                + ['BA-%s' % m for m in months] \
                + ['BAS-%s' % m for m in months]
-    
+
     freqs = {'D' : 252., 'W' : 52., 'M' : 12., 'Q' : 4., 'A' : 1.}
     freqs.update(zip(weekoffsets, [52.] * len(weekoffsets)))
     freqs.update(zip(qtroffsets, [4.] * len(qtroffsets)))
@@ -190,16 +190,16 @@ def constrain(*objs):
     # TODO: build in the options to first dropna on each index before finding
     #   intersection, AND to use `dropcol` from this module.  Note that this
     #   would require filtering out Series to which dropcol isn't applicable
-    
+
     # A little bit of set magic below:
     # note that pd.Index.intersection only applies to 2 Index objects
     common_idx = pd.Index(set.intersection(*[set(o.index) for o in objs]))
     new_dfs = [o.reindex(common_idx) for o in objs]
 
     return tuple(new_dfs)
-    
-def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0, 
-                      months=0, days=0, weeks=0,  year=None, month=None, 
+
+def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
+                      months=0, days=0, weeks=0,  year=None, month=None,
                       day=None):
 
     """Constrain a Series/DataFrame to a specified lookback period.
@@ -260,7 +260,7 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
     # Start date will be computed relative to `end`
     end = r.index[-1]
 
-    # Establish some funky date conventions assumed in finance.  If the end 
+    # Establish some funky date conventions assumed in finance.  If the end
     # date is 6/30, the date *3 months prior* is 3/31, not 3/30 as would be
     # produced by dateutil.relativedelta.
 
@@ -279,9 +279,9 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
     return r[start:end]
 
 def dropcols(df, start=None, end=None):
-    """Drop columns that contain NaN within [start, end] inclusive.  
+    """Drop columns that contain NaN within [start, end] inclusive.
 
-    A wrapper around DataFrame.dropna() that builds an easier *subset* 
+    A wrapper around DataFrame.dropna() that builds an easier *subset*
     syntax for tseries-indexed DataFrames.
 
     Parameters
@@ -318,7 +318,7 @@ def dropcols(df, start=None, end=None):
 
     """
 
-    # TODO: how do you want to handle instances where 
+    # TODO: how do you want to handle instances where
 
     if isinstance(df, Series):
         raise ValueError('func only applies to `pd.DataFrame`')
@@ -345,7 +345,7 @@ def encode(*args):
     unique = _uniquewords(*args)
     feature_vectors = np.zeros((len(args), len(unique)))
     for vec, s in zip(feature_vectors, args):
-        for word in s:                
+        for word in s:
             vec[unique[word]] = 1
     return feature_vectors
 
@@ -355,7 +355,7 @@ def equal_weights(n, sumto=1.):
     Note that sum is subject to typical Python floating point limitations.
 
     n -> int or float; the number of weights, summing to `sumto`
-    
+
     Example
     =======
     print(equal_weights(5))
@@ -372,7 +372,7 @@ def expanding_stdize(obj, **kwargs):
     """Standardize a pandas object column-wise on expanding window.
 
     **kwargs -> passed to `obj.expanding`
-    
+
     Example
     =======
     df = pd.DataFrame(np.random.randn(10, 3))
@@ -389,7 +389,7 @@ def expanding_stdize(obj, **kwargs):
     8 -0.64949  0.08028 -0.51354
     9  0.15280 -0.73283 -0.84907
     """
-    
+
     return (obj - obj.expanding(**kwargs).mean()) \
          / (obj.expanding(**kwargs).std())
 
@@ -397,9 +397,8 @@ def flatten(iterable):
     """Flatten a nested iterable.  Returns a generator object.
 
     More flexible than list comprehension of the format:
-    [item for sublist in list for item in sublist]
-    Because it can handle a "hybrid" list of lists where some elements are
-    not iterable.
+    `[item for sublist in list for item in sublist]` because it can handle a
+    'hybrid' list of lists where some elements are not iterable.
 
     Example
     =======
@@ -415,7 +414,7 @@ def flatten(iterable):
     ======
     http://rightfootin.blogspot.com/2006/09/more-on-python-flatten.html
     """
-    
+
     # Functional, but also throws TypeError if `iterable` is not iterable
     it = iter(iterable)
 
@@ -460,7 +459,7 @@ def pickle_option(func):
 
 def public_dir(obj, underscores=1):
     """public_dir(obj, underscores=1) -> list of strings
-    
+
     Return an alphabetized list of names comprising the attributes
     of the given object, EXCEPT those starting with the specified number of
     `underscores`.
@@ -480,7 +479,7 @@ def public_dir(obj, underscores=1):
             pass
         def normfunc(self):
             pass
-        
+
     c = Cls()
     public_dir(c)
     Out[16]: ['a', 'normfunc']
@@ -503,7 +502,7 @@ def random_tickers(length, n, ends_in=None):
         number of tickers to generate
     ends_in : str, default None
         specify the final element(s) of each ticker (for example, 'X')
-    
+
     Examples
     ========
     print(random_tickers(5, 4, 'X'))
@@ -512,7 +511,7 @@ def random_tickers(length, n, ends_in=None):
     print(random_tickers(5, 4))
     ['OLHZP', 'MCAAJ', 'JMKFD', 'FFSCH']
     """
-    
+
     letters = list(string.ascii_uppercase)
 
     if ends_in is None:

@@ -601,7 +601,7 @@ class PCA(object):
         Using Principal Component Analysis, 2016
     """
 
-    def __init__(self, m, threshold='Jolliffe'):
+    def __init__(self, m, threshold='Jolliffe', u_based_decision=False):
         # Keep a raw version of m for view and create a scaled version, ms
         # scaled to N~(0,1)
         if isinstance(m, DataFrame):
@@ -622,6 +622,7 @@ class PCA(object):
                 self.threshold = float(threshold)
         else:
             self.threshold = 0.
+        self.u_based_decision = u_based_decision
 
     def fit(self):
         """Fit the model by computing full SVD on m.
@@ -655,7 +656,8 @@ class PCA(object):
         # This implementation uses u_based_decision=False rather than the
         # default True to flip that logic and ensure the resulting
         # components and loadings have high positive coefficients
-        self.u, self.v = svd_flip(self.u, self.v, u_based_decision=False)
+        self.u, self.v = svd_flip(self.u, self.v, 
+                                  u_based_decision=self.u_based_decision)
 
         # Drop eigenvalues with value > threshold
         # *keep* is number of components retained

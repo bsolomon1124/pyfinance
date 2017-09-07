@@ -1,19 +1,9 @@
 """Statistical analysis of time series security returns data.
 
-Designed to mimic FactSet's Research System's Style, Performance, & Risk
-(SPAR), with:
-
-- Improved speed.  Makes heavy use of the NumPy library, which targets the
-  CPython reference implementation of Python.  Cpython is a non-optimizing
-  bytecode interpreter designed mainly for array operations.
-- Added extensions.  Supports methods such as principal component
-  analysis (PCA), multifactor regression, simulation, qqplots, conditional
-  correlation, and efficient frontier modeling, among others.
-
 Methods include 'benchmark-agnostic' statistics such as max drawdown, as
 well as benchmark-relative statistics such as correlation; these stats
 will always have a `benchmark` parameter.  Note that the methods currently
-only support *single-benchmark* cases.
+only support *single-benchmark* cases.  pandas' DataFrame/Series are inputs.
 
 Using `prep`
 ============

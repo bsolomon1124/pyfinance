@@ -69,34 +69,6 @@ import pandas as pd
 from pandas import Series, DataFrame
 from pandas.tseries import offsets
 
-# Text to digit translation used in `constrain_horizon`
-TEXTTONUM = {
-    'zero': 0,
-    'one': 1,
-    'two': 2,
-    'three': 3,
-    'four': 4,
-    'five': 5,
-    'six': 6,
-    'seven': 7,
-    'eight': 8,
-    'nine': 9,
-    'ten': 10,
-    'eleven': 11,
-    'twelve': 12,
-    'thirteen': 13,
-    'fourteen': 14,
-    'fifteen': 15,
-    'sixteen': 16,
-    'seventeen': 17,
-    'eighteen': 18,
-    'nineteen': 19,
-    'twenty': 20,
-    'twenty four': 24,
-    'thirty six': 36,
-    }
-
-
 def appender(defaultdocs, passed_to=None):
     """Decorator for appending commonly used parameter definitions.
 
@@ -264,6 +236,32 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
         original datetime with the value(s) in relativedelta
     """
 
+    textnum = {
+        'zero': 0,
+        'one': 1,
+        'two': 2,
+        'three': 3,
+        'four': 4,
+        'five': 5,
+        'six': 6,
+        'seven': 7,
+        'eight': 8,
+        'nine': 9,
+        'ten': 10,
+        'eleven': 11,
+        'twelve': 12,
+        'thirteen': 13,
+        'fourteen': 14,
+        'fifteen': 15,
+        'sixteen': 16,
+        'seventeen': 17,
+        'eighteen': 18,
+        'nineteen': 19,
+        'twenty': 20,
+        'twenty four': 24,
+        'thirty six': 36,
+        }
+
     relativedeltas = years, quarters, months, days, weeks, year, month, day
     if cust is not None and any(relativedeltas):
         raise ValueError('Cannot specify competing (nonzero) values for both'
@@ -279,11 +277,11 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
 
         elif cust.endswith(('years ago', 'year ago', 'year', 'years')):
             pos = cust.find(' year')
-            years = _num_to_dec[cust[:pos].replace('-', '')]
+            years = textnum[cust[:pos].replace('-', '')]
 
         elif cust.endswith(('months ago', 'month ago', 'month', 'months')):
             pos = cust.find(' month')
-            months = _num_to_dec[cust[:pos].replace('-', '')]
+            months = textnum[cust[:pos].replace('-', '')]
 
         else:
             raise ValueError('`cust` not recognized.')

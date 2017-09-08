@@ -411,6 +411,10 @@ class RollingOLS(OLS):
     """Rolling OLS regression."""
     # TODO: docs
     def __init__(self, y, x=None, window=None, hasconst=False, names=None):
+
+        if window is None:
+            raise ValueError('must specify `window`')
+
         OLS.__init__(self, y=y, x=x, hasconst=hasconst, names=names)
 
         self.xwins = utils.rolling_windows(self.x, window=window)
@@ -420,8 +424,6 @@ class RollingOLS(OLS):
         self.models = [OLS(y=ywin, x=xwin) for ywin, xwin
                        in zip(self.ywins, self.xwins)]
 
-    if window is None:
-        raise ValueError('must specify `window`')
 
     def _rolling_stat(self, stat, **kwargs):
         """Generic rolling attribute-getter."""

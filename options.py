@@ -190,6 +190,7 @@ class BSM(object):
             Standard Deviation, 1988.
         """
 
+        # Initial guess/anchor
         vol = np.sqrt(2. * np.pi / self.T) * (value / self.S0)
         for _ in itertools.repeat(None, iters):
             opt = BSM(S0=self.S0, K=self.K, T=self.T, r=self.r, sigma=vol,
@@ -221,7 +222,6 @@ class BSM(object):
 
 SIGN = {'long' : 1., 'Long' : 1., 'l' : 1., 'L' : 1.,
          'short' : -1., 'Short' : -1., 's' : -1., 'S' : -1.}
-
 
 class Option(object):
     def __init__(self, K=None, price=None, St=None, kind='call', pos='long'):
@@ -456,7 +456,8 @@ class LongPutLadder(BearSpread):
     """Bear put spread combined with selling another lower-strike put."""
     def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
                  price2=None, price3=None):
-        BearSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2, price2=price3)
+        BearSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2, 
+                            price2=price3)
         self.K1 = K1
         self.price1 = price1
         self.add_option(K=K1, price=price1, St=St, kind='put', pos='short')
@@ -466,7 +467,8 @@ class ShortPutLadder(BearSpread):
     """Bull put spread combined with buying another lower-strike put."""
     def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
                  price2=None, price3=None):
-        BullSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2, price2=price3,
+        BullSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2, 
+                            price2=price3,
                             kind='put')
         self.K1 = K1
         self.price1 = price1

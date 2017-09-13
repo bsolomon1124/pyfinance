@@ -73,11 +73,6 @@ class BSM(object):
     kind : str, {'call', 'put'}, default 'call'
         type of option
 
-    Resources
-    =========
-    Thomas Ho Company Ltd: Financial Models
-      http://www.thomasho.com/mainpages/?analysoln
-
     Example
     =======
     op = Option(S0=100, K=100, T=1, r=.04, sigma=.2)
@@ -104,6 +99,9 @@ class BSM(object):
     [ 9.92505372  9.41590973  8.92571336  8.4543027   8.00147434  7.56698592
       7.15055895  6.75188165  6.37061188  6.00638013]
 
+    # Note that if multiple parameters are array-like, the resulting methods
+    #     will be evaluated in a zipped element-wise fashion between them.
+
     ops = Option(S0=np.arange(100, 110), K=np.arange(100, 110), T=1, r=.04,
                  sigma=.2)
 
@@ -129,12 +127,12 @@ class BSM(object):
                 / (self.sigma * np.sqrt(self.T)))
         self.d2 = self.d1 - self.sigma * np.sqrt(self.T)
 
-        # Several greeks use negated terms dependent on option type
+        # Several greeks use negated terms dependent on option type.
         # For example, delta of call is N(d1) and delta put is N(d1) - 1
-        # and theta may use N(d2) or N(-d2).  In these lists:
-        # - element 0 (0, -1) is used in delta and omega
-        # - element 1 (1, -1) is used in rho and theta
-        # - the negative of element 1 (-1, 1) is used in theta
+        #     and theta may use N(d2) or N(-d2).  In these lists:
+        #     - element 0 (0, -1) is used in delta and omega
+        #     - element 1 (1, -1) is used in rho and theta
+        #     - negated 1 (-1, 1) is used in theta
 
         self._sign = {'call' : [0, 1], 'put' : [-1, -1]}
         self._sign = self._sign[self.kind]
@@ -146,7 +144,7 @@ class BSM(object):
                  self.T, self.r, self.sigma))
 
     def value(self):
-        """Compute option value."""
+        """Compute option value according to BSM model."""
         return self._sign[1] * self.S0 \
                    * norm.cdf(self._sign[1] * self.d1, 0.0, 1.0) \
                    - self._sign[1] * self.K * np.exp(-self.r * self.T) \
@@ -190,9 +188,8 @@ class BSM(object):
             Standard Deviation, 1988.
         """
 
-        # Initial guess/anchor
         vol = np.sqrt(2. * np.pi / self.T) * (value / self.S0)
-        for _ in itertools.repeat(None, iters):
+        for _ in itertools.repeat(None, iters):  # Faster than range
             opt = BSM(S0=self.S0, K=self.K, T=self.T, r=self.r, sigma=vol,
                       kind=self.kind)
             diff = value - opt.value()
@@ -267,8 +264,8 @@ class Put(Option):
 
 
 # Options strategies: combinations of multiple options.  `OpStrat` is a
-# generic options class from which other (specifically-named) options
-# strategies inherit
+#     generic options class from which other (specifically-named) options
+#     strategies inherit
 # ----------------------------------------------------------------------------
 
 
@@ -306,7 +303,6 @@ class OpStrat(object):
                               ])
 
             return DataFrame(res)
-
         else:
             return None
 
@@ -359,7 +355,7 @@ class Strip(Straddle):
 
 
 class Strap(Straddle):
-    """Combination of a straddle with a call.  Long 2 calls & 1 puts at K."""
+    """Combination of a straddle with a call.  Long 2 calls & 1 put at K."""
     def __init__(self, St=None, K=None, price=None):
         Straddle.__init__(self, St=St, K=K, price=price)
         self.add_option(K=K, price=price, St=St, kind='call')
@@ -367,7 +363,6 @@ class Strap(Straddle):
 
 class ShortStraddle(OpStrat):
     """Short-volatility exposure.  Short a put and call, both at K."""
-
     def __init__(self, St=None, K=None, price=None):
         OpStrat.__init__(self, St=St)
         self.K = K

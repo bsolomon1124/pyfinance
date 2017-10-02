@@ -61,7 +61,7 @@ import string
 import textwrap
 try:
    import cPickle as pickle
-except (ModuleNotFoundError, ImportError):
+except ImportError:
    import pickle
 
 import numpy as np

@@ -844,7 +844,7 @@ def semi_stdev(r, anlz=True, ddof=1, thresh=0.0):
 
 
 @utils.appender(_defaultdocs, passed_to='semi_std')
-def sortino_ratio(r, ddof=1, log=False, thresh=0.0, **kwargs):
+def sortino_ratio(r, ddof=1, log=False, thresh=0.0, anlz=True, **kwargs):
     """A measure of risk-adjusted return that penalizes downside volatility.
 
     The Sortino Ratio is similar to the Sharpe Ratio except the Sortino Ratio
@@ -1049,7 +1049,7 @@ def tracking_error(r, benchmark, window=None, log=False, anlz=True, ddof=1,
 
 
 @utils.appender(_defaultdocs, passed_to='excess_returns')
-def batting_avg(r, benchmark, window=None, log=False, anlz=True, **kwargs):
+def batting_avg(r, benchmark, window=None, log=False, anlz=True, thresh=0.0,**kwargs):
     """Returns batting average versus the benchmark, rolling optional.
 
     Batting avg. is the number of periods that the portfolio outperforms
@@ -1059,7 +1059,7 @@ def batting_avg(r, benchmark, window=None, log=False, anlz=True, **kwargs):
     returns stream."""
 
     er = excess_returns(r, benchmark=benchmark, window=window, log=log,
-                        anlz=anlz, **vargs)
+                        anlz=anlz, **kwargs)
     return er[er >= thresh].notnull().count() / er.notnull().count()
 
 

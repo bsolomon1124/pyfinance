@@ -670,7 +670,7 @@ def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
     res = returns.prep(res, in_format='dec', name='RF', freq='D')
 
     if freq != 'D':
-        res = returns.prep(d.rollup(out_freq=freq), in_format='dec', freq=freq)
+        res = returns.prep(dr.rollup(out_freq=freq), in_format='dec', freq=freq)
 
     return res
 

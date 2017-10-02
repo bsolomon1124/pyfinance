@@ -139,7 +139,7 @@ __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 __all__ = [
     'return_relatives', 'return_index', 'cumulative_return',
-    'cumulative_returns', 'drawdown_index', 'stdev', 'correl', 'cond_correl'
+    'cumulative_returns', 'drawdown_index', 'stdev', 'correl', 'cond_correl',
     'covar', 'jarque_bera', 'bias_ratio', 'sharpe_ratio', 'msquared',
     'rollup', 'max_drawdown', 'calmar_ratio', 'ulcer_index',
     'semi_stdev', 'sortino_ratio', 'rolling_returns', 'min_max_return',
@@ -154,7 +154,7 @@ __all__ = [
 from collections import OrderedDict
 from functools import lru_cache
 import itertools
-import re
+#import re
 import warnings
 
 import numpy as np

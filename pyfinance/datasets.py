@@ -33,7 +33,7 @@ import re
 import time
 try:
    import cPickle as pickle
-except (ModuleNotFoundError, ImportError):
+except ImportError:
    import pickle
 
 from bs4 import BeautifulSoup

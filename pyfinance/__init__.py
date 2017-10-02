@@ -14,8 +14,8 @@ __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 NUMTODEC = {'num' : 1., 'dec' : 0.01}
 
-from options import *
-from returns import *
+from .options import *
+from .returns import *
 
 from pyfinance.ols import *
 from pyfinance.utils import *

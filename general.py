@@ -40,6 +40,7 @@ from collections import OrderedDict
 import itertools
 import warnings
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
@@ -50,7 +51,7 @@ import seaborn.apionly as sns
 from sklearn.preprocessing import scale
 from sklearn.utils.extmath import svd_flip
 
-from pyfinance import datasets, ols, returns, utils
+from pyfinance import datasets, ols, returns, utils, NUMTODEC
 
 def activeshare(fund, idx, in_format='num'):
     """Compute the active ahare of a fund versus an index.
@@ -95,8 +96,8 @@ def activeshare(fund, idx, in_format='num'):
     if not (fund.index.is_unique) and (idx.index.is_unique):
         raise ValueError('inputs do not have unique indices')
 
-    fund = num_to_dec(fund, in_format=in_format)
-    idx = num_to_dec(idx, in_format=in_format)
+    fund = fund * NUMTODEC[in_format]
+    idx = idx * NUMTODEC[in_format]
 
     un = fund.index.union(idx.index)
     fund = fund.reindex(un, fill_value=0.)
@@ -286,8 +287,8 @@ class BestFitDist(object):
 
     def plot(self):
         """Plot the empirical histogram versus best-fit distribution's PDF."""
-        plt.plot(self.bin_edges, self.hist)
-        plt.plot(self.bin_edges, self.best_pdf)
+        plt.plot(self.bin_edges, self.hist, self.bin_edges, self.best_pdf)
+        # TODO: labels
 
 
 def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,

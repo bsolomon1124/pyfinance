@@ -615,14 +615,22 @@ def rolling_windows(a, window):
       [16 17 18 19]]]
     """
 
+    if window > a.shape[0]:
+        raise ValueError('Specified `window` length of {0} exceeds length of'
+                         ' `a`, {1}.'.format(window, a.shape[0])) 
     if isinstance(a, (Series, DataFrame)):
         a = a.values
     if a.ndim == 1:
         a = a.reshape(-1, 1)
     shape = (a.shape[0] - window + 1, window) + a.shape[1:]
     strides = (a.strides[0],) + a.strides
-    windows = np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
-    return np.squeeze(windows)
+    windows = np.squeeze(np.lib.stride_tricks.as_strided(a, shape=shape, 
+                                                         strides=strides))
+    # In cases where window == len(a), we actually want to "unsqueeze" to 2d.
+    #     I.e., we still want a "windowed" structure with 1 window.
+    if windows.ndim == 1:
+        windows = np.atleast_2d(windows)
+    return windows
 
 
 def view(df, row=10, col=5):

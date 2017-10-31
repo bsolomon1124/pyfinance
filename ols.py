@@ -1,8 +1,9 @@
 """Ordinary least-squares (OLS) regression.  Static and rolling cases."""
 
-__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
+__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 __all__ = ['OLS', 'RollingOLS']
+
 
 from collections import OrderedDict
 from functools import lru_cache

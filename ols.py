@@ -1,11 +1,11 @@
-"""Ordinary least-squares (OLS) regression."""
+"""Ordinary least-squares (OLS) regression.  Static and rolling cases."""
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 __all__ = ['OLS', 'RollingOLS']
 
 from collections import OrderedDict
-import time
+from functools import lru_cache
 
 import numpy as np
 from pandas import DataFrame, Series
@@ -14,464 +14,579 @@ from statsmodels.tools import add_constant
 
 from pyfinance import utils
 
-# TODO: why not make `y` always 2d?
-# TODO: use np.atleast_1d when you're getting a 0d array of a single scalar
+
+# TODO: 
+# - constrained regression case, preferably with cvxopt
+# - confidence intervals
+# - deal with problem of unneeded dimensionality (np.squeeze).  For
+#       k=1, do you want a 1d or 2d array for rolling cases?  1d makes sense.
+# - handle (drop) NaNs
+
+
+def _rolling_lstsq(x, y):
+    """Finds solution for the rolling case.  Matrix formulation."""
+    return np.squeeze(np.matmul(np.linalg.inv(np.matmul(x.swapaxes(1,2), x)),
+                      np.matmul(x.swapaxes(1,2), np.atleast_3d(y))))    
+
+
+def _confirm_constant(a):
+    """Confirm `a` has volumn vector of 1s."""
+    return np.any(np.equal(np.ptp(a, axis=0), 1.))
+
+
+def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05, 
+                           atol=1e-08):
+    """Helper func to interaction between has_const and use_const params.
+
+    has_const   use_const   outcome
+    ---------   ---------   -------
+    True        True        Confirm that a has constant; return a
+    False       False       Confirm that a doesn't have constant; return a 
+    False       True        Confirm that a doesn't have constant; add constant
+    True        False       ValueError
+    """
+
+    if all((has_const, use_const)):
+        if not _confirm_constant(a):
+            raise ValueError('Data does not contain a constant; specify'
+                             ' has_const=False')
+        k = a.shape[-1] - 1
+    elif not any((has_const, use_const)):
+        if _confirm_constant(a):
+            raise ValueError('Data already contains a constant; specify'
+                             ' has_const=True')
+        k = a.shape[-1]
+    elif not has_const and use_const:
+        # Also run a quick check to confirm that `a` is *not* ~N(0,1).
+        #     In this case, constant should be zero. (exclude it entirely)
+        c1 = np.allclose(a.mean(axis=0), b=0., rtol=rtol, atol=atol)
+        c2 = np.allclose(a.std(axis=0), b=1., rtol=rtol, atol=atol)
+        if c1 and c2:
+            # TODO: maybe we want to just warn here?
+            raise ValueError('Data appears to be ~N(0,1).  Specify'
+                             ' use_constant=False.')
+        # `has_constant` does checking on its own and raises VE if True
+        a = add_constant(a, has_constant='raise')
+        k = a.shape[-1] - 1
+    else:
+        raise ValueError('`use_const` == False implies has_const is False.')
+
+    return k, a
+
+
+def _handle_ab(solution, use_const=True):
+    b = solution[1:] if use_const else solution
+    b = np.asscalar(b) if b.size == 1 else b
+    a = solution[0] if use_const else None
+    return a, b
+
+
+def _handle_rolling_ab(solution, use_const=True):
+    b = solution[:, 1:] if use_const else solution
+    a = solution[:, 0] if use_const else None
+    return a, b
+
+
+def _clean_xy(y, x=None, has_const=False, use_const=True):
+    x = np.asanyarray(x) if x is not None else None
+    y = np.asanyarray(y)
+
+    # If only `y` is given (and `x=None`), `y` is assumed to be the first
+    # column of `y` and `x` the remaining [1:] columns
+    if x is None:
+        x = y[:, 1:]
+        y = y[:, 0]
+
+    k, x = _check_constant_params(x, has_const=has_const, 
+                                            use_const=use_const)
+    y = np.squeeze(y)
+    x = np.atleast_2d(x)        
+    assert y.ndim == 1 and x.ndim > 1
+    return x, y, k
+
 
 class OLS(object):
-    """OLS regression.  Designed for simplicity & usability.
+    """Ordinary least-squares (OLS) regression.
 
-    Largely mimics statsmodels' OLS RegressionResultsWrapper.
+    Implemented in NumPy.  Outputs are NumPy arrays or scalars.
+
+    Attributes largely mimic statsmodels' OLS RegressionResultsWrapper.
     (see statsmodels.regression.linear_model.RegressionResults)
 
     The core of the model is calculated with the 'gelsd' LAPACK driver,
     witin numpy.linalg.lstsq, yielding the coefficients (parameters).  Most
     methods are then a derivation of these coefficients.
 
-    This implementation is built to support several different cases:
-
-    # of y vectors     # of x vectors (k)   Supported?
-    ==============     ==================   =========
-    1                  1                    Yes
-    1                  > 1                  Yes
-    > 1                1                    Yes (each y treated separately)
-    > 1                > 1                  No
-
     Parameters
     ==========
-    y : array-like (ndarray, Series, DataFrame)
-        The y (dependent, response, endogenous) variable
-    x : array-like (ndarray, Series, DataFrame) or None, default None
-        The x (independent, explanatory, exogenous) variable.  If only `y`
+    y : array-like
+        The single y (dependent, response, endogenous) variable
+    x : array-like or None, default None
+        The x (independent, explanatory, exogenous) variables.  If only `y`
         is given (and `x=None`), `y` is assumed to be the first column of
         `y` and `x` the remaining [1:] columns
-    hasconst : bool, default False
+    has_const : bool, default False
         Specifies whether `x` includes a user-supplied constant (a column
         vector).  If False, it is added at instantiation
-    names : dict, default None
-        User-specified names of the y and x variables.  If None, they will be
-        inferred from the input data attributes (i.e. name of Series or columns
-        of a DataFrame).  If not None, specify names with keys ('y', 'x')
-
-    Attributes
-    ==========
-    d : str
-        Date of model instantiation
-    t : str
-        Time of model instantiation
-    n : int
-        Number of observations
-    k : int
-        Number of `x` terms, excluding the intercept
-    x : np.ndarray
-        The exogenous data as np.array(n, k + 1), with appended column vector
-    y : np.ndarray
-        The endogenous data as np.array(n,)
-    names : dict
-        Variable names with keys ('x', 'y')
-    solution :
-        The returned `x` from np.linalg.lstsq
+    use_const ; bool, default True
+        Whether to include an intercept term in the model output.  Note the
+        difference between has_const and use_const.  The former specifies
+        whether a column vector of 1s is included in the input; the latter
+        specifies whether the model itself should include a constant
+        (intercept) term.  Exogenous data that is ~N(0,1) would have a
+        constant equal to zero; specify use_const=False in this situation
     """
 
-    # TODO: what about a case with >1 y vectors and > 1 x vectors?
-
-    def __init__(self, y, x=None, hasconst=False, names=None):
-        # TODO: constrained regression case, preferably with cvxopt, not scipy
-
-        # Date and time of class instantiation; used in model summary
-        self.d = time.strftime('%Y-%m-%d')
-        self.t = time.strftime('%I:%M %p')
-
-        # Number of observations
-        # TODO: handle (drop) NaNs
-        self.n = len(y)
-
-        # Retain special indices (i.e. DatetimeIndex) for later use
-        # otherwise, just use a 0-indexed range(n)
-        if hasattr(y, 'index'):
-            self.idx = y.index
-        else:
-            self.idx = np.arange(self.n)
-
-        # If only `y` is given (and `x=None`), `y` is assumed to be the first
-        # column of `y` and `x` the remaining [1:] columns
-        if x is None:
-            if isinstance(y, DataFrame):
-                self.names = {'y' : y.columns[0].tolist(),
-                              'x' : y.columns[1:].tolist()
-                             }
-                x = y.iloc[:, 1:].values
-                y = y.iloc[:, 0 ].values
-            elif isinstance(y, np.ndarray):
-                x = y[:, 1:]
-                y = y[:, 0 ]
-                self.names = {'y' : 'y', 'x' : ['var%s' % i for
-                                                i in range(x.shape[1])]}
-
-        # Case of ndarray with x not None
-        elif isinstance(y, np.ndarray):
-            if x.ndim == 1:
-                x = x.reshape(-1,1)
-            self.names = {'y' : 'y', 'x' : ['var%s' % i for
-                                            i in range(x.shape[1])]}
-
-        # Case of Series or DataFrame with x not None
-        else:
-            self.names = {'y' : y.name if isinstance(y, Series) else
-                                y.columns.tolist(),
-                          'x' : x.name if isinstance(x, Series) else
-                                x.columns.tolist()}
-            x = x.values
-            y = y.values
-            # TODO: will throw error if you're passing an array, not pandas
-
-        if hasconst == False:
-            x = add_constant(x)
-
-        # Now we've gotten y and x down to consistently shaped ndarrays
-        # regardless of input
-        self.x = x
-        self.y = np.squeeze(y)
-        self.k = self.x.shape[1] - 1
-
-        if names is not None:
-            # Overwrite above values, no prettier logic than this
-            self.names = names
-        self.names['x'].insert(0, 'alpha')
-
+    def __init__(self, y, x=None, has_const=False, use_const=True):
+        self.x, self.y, self.k = _clean_xy(y, x)
+        self.n = y.shape[0]
+                
         # np.lstsq(a,b): Solves the equation a x = b by computing a vector x
+        # TODO: throws LinAlgError for 1d x, has_const=False, use_const=False.
+        #       np.linalg.lstsq specifies `a` must be (M,N).
         self.solution = np.linalg.lstsq(self.x, self.y)[0]
 
+        self.has_const = has_const
+        self.use_const = use_const
+
+
+    @property
     def alpha(self):
         """The intercept term (alpha).
 
         Technically defined as the coefficient to a column vector of ones.
         """
+        
+        return _handle_ab(self.solution, self.use_const)[0]
 
-        # TODO: with a single x term, this will return a 0d array
-        #     such as array(1.2632862808026597); may not be ideal for rolling.
-        return np.squeeze(self.solution[0])
 
-    def anova(self):
-        """Analysis of variance (ANOVA) table for the model."""
-        # TODO: works, but not pretty, for count(y) > 1
-        # fixes: dict of DataFrames? or MultiIndex
-        if self.y.ndim > 1:
-            raise RuntimeError('Method `anova` is not supported for cases with'
-                               ' greater than one y variable.')
-        stats = [('df', [self.df_reg(), self.df_err(), self.df_tot()]),
-                 ('ss', [self.ss_reg(), self.ss_err(), self.ss_tot()]),
-                 ('ms', [self.ms_reg(), self.ms_err(), np.nan]),
-                 ('f', [self.fstat(), np.nan, np.nan]),
-                 ('sig_f', [self.fstat_sig(), np.nan, np.nan])
-                ]
-
-        return DataFrame(OrderedDict(stats), index=['reg', 'err', 'tot'])
-
+    @property
     def beta(self):
         """The parameters (coefficients), excl. the intercept."""
-        return np.squeeze(self.solution[1:])
+        return _handle_ab(self.solution, self.use_const)[1]
 
-    def _ci_all(self, a=0.05):
-        z = scs.t(self.df_err()).ppf(1. - a / 2.)
-        b = self.solution.T
-        se = self._se_all()
 
-        # upper, lower
-        return np.array([b - z * se, b + z * se])
-
-    def ci_alpha(self, a=0.05):
-        """Confidence interval for the intercept (alpha)."""
-        ci = self._ci_all(a=a)
-        ci = ci[:, 0] if ci.ndim == 2 else ci[:, :, 0]
-
-        return ci
-
-    def ci_beta(self, a=0.05):
-        """Confidence interval for the parameters, excl. intercept.
-
-        May need to transpose the output if using in a DataFrame.
-        """
-        ci = self._ci_all(a=a)
-        # TODO: may need to transpose
-        # TODO: check for cases with k > 1
-        ci = ci[:, 1] if ci.ndim == 2 else ci[:, :, 1]
-        return ci
-
+    @property
     def condition_number(self):
         """Condition number of x; ratio of largest to smallest eigenvalue."""
         x = np.matrix(self.x)
         ev = np.linalg.eig(x.T * x)[0]
         return np.sqrt(ev.max() / ev.min())
 
+
+    @property
     def df_tot(self):
         """Total degrees of freedom, n - 1."""
-        return self.n - 1.
+        return self.n - 1
 
+
+    @property
     def df_reg(self):
         """Model degrees of freedom. Equal to k."""
         return self.k
 
+
+    @property
     def df_err(self):
         """Residual degrees of freedom. n - k - 1."""
-        return self.n - self.k - 1.
+        return self.n - self.k - 1
 
+
+    @property
     def durbin_watson(self):
-        return np.sum( np.diff(self.resids()) ** 2. ) / self.ss_err()
+        return np.sum(np.diff(self.resids) ** 2.) / self.ss_err
 
+
+    @property
     def fstat(self):
         """F-statistic of the fully specified model."""
-        return self.ms_reg() / self.ms_err()
+        return self.ms_reg / self.ms_err
 
+
+    @property
     def fstat_sig(self):
         """p-value of the F-statistic."""
-        return 1 - scs.f.cdf(self.fstat(), self.df_reg(), self.df_err())
+        return 1. - scs.f.cdf(self.fstat, self.df_reg, self.df_err)
 
+
+    @property
     def jarque_bera(self):
-        return scs.jarque_bera(self.resids())[0]
+        return scs.jarque_bera(self.resids)[0]
 
+
+    @property
     def ms_err(self):
         """Mean squared error the errors (residuals)."""
-        return self.ss_err() / self.df_err()
+        return self.ss_err / self.df_err
 
+
+    @property
     def ms_reg(self):
         """Mean squared error the regression (model)."""
-        return self.ss_reg() / self.df_reg()
+        return self.ss_reg / self.df_reg
 
-    def overview(self):
-        # TODO: x_var will include 'alpha' here..
-        stats = [('run_date', self.d),
-                 ('run_time', self.t),
-                 ('y_var', self.names['y']),
-                 ('x_var', self.names['x']),
-                 ('n', self.n),
-                 ('k', self.k),
-                 ('rsq', self.rsq()),
-                 ('rsq_adj', self.rsq_adj()),
-                 ('se', self.std_err()),
-                 ('jb', self.jarque_bera()),
-                 ('dw', self.durbin_watson()),
-                 ('condno', self.condition_number())
-                ]
-        return Series(OrderedDict(stats))
 
-    def params(self):
-        """Summary table for the parameters, incl. the intercept."""
-        # TODO: throws error for count(y) > 1
-        # issue is you're trying to shove 2d arrays into single DataFrame cols
-        # fixes: dict of DataFrames?
-        # or better, MultiIndex
-        if self.y.ndim > 1:
-            raise RuntimeError('Method `params` is not supported for cases'
-                               ' with greater than one y variable.')
-        stats = [('coef', self.solution),
-                 ('se', self._se_all()),
-                 ('tstat', self._tstat_all()),
-                 ('pval', self._pvalues_all()),
-                 ('lower_ci', self._ci_all()[0]),
-                 ('upper_ci', self._ci_all()[1])
-                ]
-        return DataFrame(OrderedDict(stats), index=self.names['x'])
-
+    @property
     def predicted(self):
         """The predicted values of y (yhat)."""
         # don't transpose - shape should match that of self.y
         return self.x.dot(self.solution)
 
+
+    @property
     def _pvalues_all(self):
         """Two-tailed p values for t-stats of all parameters."""
-        return 2. * (1. - scs.t.cdf(np.abs(self._tstat_all()), self.df_err()))
+        return 2. * (1. - scs.t.cdf(np.abs(self._tstat_all), self.df_err))
 
+
+    @property
     def pvalue_alpha(self):
         """Two-tailed p values for t-stats of the intercept only."""
-        return self._pvalues_all()[0]
+        return _handle_ab(self._pvalues_all, self.use_const)[0]
 
+    @property
     def pvalue_beta(self):
         """Two-tailed p values for t-stats of parameters, excl. intercept."""
-        return self._pvalues_all()[1:]
+        return _handle_ab(self._pvalues_all, self.use_const)[1]
 
-    def resids(self, full_output=False):
-        if self.y.ndim > 1 and full_output:
-            raise RuntimeError('Method `resids` is not supported for cases'
-                               ' with greater than one y variable.')
-        """The residuals (errors).
+    @property
+    def resids(self):
+        """The residuals (errors)."""
+        return self.y - self.predicted
 
-        Parameters
-        ==========
-        full_output : bool, default False
-            If False, return an nx1 vector of residuals only.  If True, return
-            a DataFrame that also includes the actual and predicted values.
-        """
-        if full_output:
-            resids = [('actual', self.y),
-                     ('predicted', self.predicted()),
-                     ('resid', self.resids())
-                     ]
-            return DataFrame(OrderedDict(resids), index=self.idx)
-        else:
-            return self.y - self.predicted()
 
+    @property
     def rsq(self):
         """The coefficent of determination, R-squared."""
-        return self.ss_reg() / self.ss_tot()
+        return self.ss_reg / self.ss_tot
 
+
+    @property
     def rsq_adj(self):
         """Adjusted R-squared."""
         n = self.n
         k = self.k
-        return 1. - ( (1. - self.rsq()) * (n - 1.) / (n - k - 1.) )
+        return 1. - ( (1. - self.rsq) * (n - 1.) / (n - k - 1.) )
 
+
+    @property
     def _se_all(self):
         """Standard errors (SE) for all parameters, including the intercept."""
         x = np.matrix(self.x)
-        err = np.atleast_1d(self.ms_err())
+        err = np.atleast_1d(self.ms_err)
         se = np.sqrt(np.diagonal(np.linalg.inv(x.T * x)) * err[:,np.newaxis])
-        # Squeeze now rather than taking [:, i] later and creating
-        #     single-element arrays.
-
         return np.squeeze(se)
 
-        # old
-        # np.sqrt(np.diagonal(linalg.inv(x.T * x) * self.ms_err()))
-        # np.array([np.sqrt(np.diagonal(np.linalg.inv(x.T * x)
-        #           * ols.ms_err()[i])) for i in range(ols.ms_err().shape[0])])
 
+    @property
     def se_alpha(self):
         """Standard errors (SE) of the intercept (alpha) only."""
-        se = self._se_all()
-        se_alpha = se[0] if se.ndim == 1 else se[:, 0]
-        return se_alpha
+        return _handle_ab(self._se_all, self.use_const)[0]
 
+
+    @property
     def se_beta(self):
         """Standard errors (SE) of the parameters, excluding the intercept."""
-        se = self._se_all()
-        # Keep these 2d for cases with 2+ y vectors, even in cases with just
-        #     a single x vector.  Otherwise, can't distinguish what's what.
-        se_beta = se[1:] if se.ndim == 1 else se[:, 1:]
+        return _handle_ab(self._se_all, self.use_const)[1]
 
-        return se_beta
 
+    @property
     def ss_tot(self):
         """Total sum of squares."""
-        return np.sum(np.square(self.y - self.ybar()), axis=0)
+        return np.sum(np.square(self.y - self.ybar), axis=0)
 
+
+    @property
     def ss_reg(self):
         """Sum of squares of the regression."""
-        return  np.sum(np.square(self.predicted() - self.ybar()), axis=0)
+        return  np.sum(np.square(self.predicted - self.ybar), axis=0)
 
+    
+    @property
     def ss_err(self):
         """Sum of squares of the residuals (error sum of squares)."""
-        return np.sum(np.square(self.resids()), axis=0)
+        return np.sum(np.square(self.resids), axis=0)
 
+
+    @property
     def std_err(self):
         """Standard error of the estimate (SEE).  A scalar.
 
         For standard errors of parameters, see _se_all, se_alpha, and se_beta.
         """
 
-        return np.sqrt(np.sum(np.square(self.resids()), 0) / self.df_err())
+        return np.sqrt(np.sum(np.square(self.resids), axis=0)
+                       / self.df_err)
 
-    def summary(self):
-        """Summary table of regression results.  OrderedDict of subtables."""
-        if self.y.ndim > 1:
-            raise RuntimeError('Method `summary` is not supported for cases'
-                               ' with greater than one y variable.')
-        stats = [('overview', self.overview()),
-                 ('anova', self.anova()),
-                 ('params', self.params()),
-                 ('resids', self.resids(full_output=True))
-                ]
 
-        return OrderedDict(stats)
-
+    @property
     def _tstat_all(self):
         """The t-statistics of all parameters, incl. the intecept."""
-        return self.solution.T / self._se_all()
+        return self.solution.T / self._se_all
 
-    def tstat_beta(self):
-        """The t-statistics of the parameters, excl. the intecept."""
-        t = self._tstat_all()
-        # Same logic as with standard errors and other coefficient properties
-        t = t[1:] if t.ndim == 1 else t[:, 1:]
 
-        return t
-
+    @property
     def tstat_alpha(self):
         """The t-statistic of the intercept (alpha)."""
-        t = self._tstat_all()
-        t = t[0] if t.ndim == 1 else t[:, 0]
+        return _handle_ab(self._tstat_all, self.use_const)[0]
 
-        return t
 
+    @property
+    def tstat_beta(self):
+        """The t-statistics of the parameters, excl. the intecept."""
+        return _handle_ab(self._tstat_all, self.use_const)[1]
+
+
+    @property
     def ybar(self):
         """The mean of y."""
         return self.y.mean(axis=0)
 
 
-class RollingOLS(OLS):
-    """Rolling OLS regression."""
-    # TODO: docs
-    def __init__(self, y, x=None, window=None, hasconst=False, names=None):
+class RollingOLS(object):
+    """Rolling ordinary least-squares regression.
 
-        if window is None:
-            raise ValueError('must specify `window`')
+    Uses matrix formulation with NumPy broadcasting.  Outputs are NumPy arrays
+    or scalars.
 
-        OLS.__init__(self, y=y, x=x, hasconst=hasconst, names=names)
+    Attributes largely mimic statsmodels' OLS RegressionResultsWrapper.
+    (see statsmodels.regression.linear_model.RegressionResults)
 
+    The core of the model is calculated with the 'gelsd' LAPACK driver,
+    witin numpy.linalg.lstsq, yielding the coefficients (parameters).  Most
+    methods are then a derivation of these coefficients.
+
+    Parameters
+    ==========
+    y : array-like
+        The single y (dependent, response, endogenous) variable
+    x : array-like or None, default None
+        The x (independent, explanatory, exogenous) variables.  If only `y`
+        is given (and `x=None`), `y` is assumed to be the first column of
+        `y` and `x` the remaining [1:] columns
+    window : int
+        Length of each rolling window
+    has_const : bool, default False
+        Specifies whether `x` includes a user-supplied constant (a column
+        vector).  If False, it is added at instantiation
+    use_const ; bool, default True
+        Whether to include an intercept term in the model output.  Note the
+        difference between has_const and use_const.  The former specifies
+        whether a column vector of 1s is included in the input; the latter
+        specifies whether the model itself should include a constant
+        (intercept) term.  Exogenous data that is ~N(0,1) would have a
+        constant equal to zero; specify use_const=False in this situation
+    """
+
+    def __init__(self, y, x=None, window=None, has_const=False, use_const=True):
+        self.x, self.y, self.k = _clean_xy(y, x)
+        self.window = self.n = window
         self.xwins = utils.rolling_windows(self.x, window=window)
         self.ywins = utils.rolling_windows(self.y, window=window)
+        self.solution = _rolling_lstsq(self.xwins, self.ywins)
+        self.has_const = has_const
+        self.use_const = use_const
 
-        # TODO: iterator?
-        self.models = [OLS(y=ywin, x=xwin) for ywin, xwin
-                       in zip(self.ywins, self.xwins)]
 
-
-    def _rolling_stat(self, stat, **kwargs):
-        """Generic rolling attribute-getter."""
-        stats = []
-        for model in self.models:
-            s = getattr(model, stat)(**kwargs)
-            stats.append(s)
-
-        return np.array(stats)
-
-    def beta(self):
-        return self._rolling_stat('beta')
-
+    @property
     def alpha(self):
-        return self._rolling_stat('alpha')
+        """The intercept term (alpha).
 
-    def condition_number(self):
-        return self._rolling_stat('condition_number')
+        Technically defined as the coefficient to a column vector of ones.
+        """
 
-    def fstat(self):
-        return self._rolling_stat('fstat')
+        return _handle_rolling_ab(self.solution, self.use_const)[0]
 
-    def fstat_sig(self):
-        return self._rolling_stat('fstat_sig')
 
-    def predicted(self, full_output=False):
-        return self._rolling_stat('predicted')
+    @property
+    def beta(self):
+        """The parameters (coefficients), excl. the intercept."""
+        return _handle_rolling_ab(self.solution, self.use_const)[1]
 
-    def jarque_bera(self, full_output=False):
-        return self._rolling_stat('jarque_bera')
 
-    def pvalue_alpha(self, full_output=False):
-        return self._rolling_stat('pvalue_alpha')
+    @property
+    def df_tot(self):
+        """Total degrees of freedom, n - 1."""
+        return self.n - 1
 
-    def pvalue_beta(self, full_output=False):
-        return self._rolling_stat('pvalue_beta')
 
-    def resids(self, full_output=False):
-        return self._rolling_stat('resids')
+    @property
+    def df_reg(self):
+        """Model degrees of freedom. Equal to k."""
+        return self.k
 
+
+    @property
+    def df_err(self):
+        """Residual degrees of freedom. n - k - 1."""
+        return self.n - self.k - 1
+
+
+    @property
+    def std_err(self):
+        """Standard error of the estimate (SEE).  A scalar.
+
+        For standard errors of parameters, see _se_all, se_alpha, and se_beta.
+        """
+        return np.sqrt(np.sum(np.square(self.resids), axis=1)
+                       / self.df_err)
+
+
+    @property
+    @lru_cache(maxsize=None)
+    def predicted(self):
+        """The predicted values of y ('yhat')."""
+        return np.squeeze(np.matmul(self.xwins, np.expand_dims(self.solution, 
+                                                          axis=-1)))
+
+
+    @property
+    @lru_cache(maxsize=None)
+    def resids(self):
+        return self.ywins - self.predicted
+
+
+    @property
+    def jarque_bera(self):
+        return np.apply_along_axis(scs.jarque_bera, 1, self.resids)[:, 0]
+
+
+    @property
+    def durbin_watson(self):
+        return np.sum(np.square(np.diff(self.resids))
+                      / np.expand_dims(self.ss_err, axis=-1), axis=1)
+
+    @property
+    @lru_cache(maxsize=None)
+    def ybar(self):
+        """The mean of y."""
+        return self.ywins.mean(axis=1)
+
+
+    @property
+    @lru_cache(maxsize=None)
+    def ss_tot(self):
+        """Total sum of squares."""
+        return np.sum(np.square(self.ywins - np.expand_dims(self.ybar, 
+                                                       axis=-1)), axis=1)
+
+
+    @property
+    @lru_cache(maxsize=None)
+    def ss_reg(self):
+        """Sum of squares of the regression."""
+        return np.sum(np.square(self.predicted
+                                - np.expand_dims(self.ybar, axis=1)), axis=1)
+  
+ 
+    @property 
+    @lru_cache(maxsize=None)
+    def ss_err(self):
+        """Sum of squares of the residuals (error sum of squares)."""
+        return np.sum(np.square(self.resids), axis=1)
+
+
+    @property
     def rsq(self):
-        return self._rolling_stat('rsq')
+        """The coefficent of determination, R-squared."""
+        return self.ss_reg / self.ss_tot
 
+
+    @property
     def rsq_adj(self):
-        return self._rolling_stat('rsq_adj')
+        """Adjusted R-squared."""
+        n = self.n
+        k = self.k
+        return 1. - ((1. - self.rsq) * (n - 1.) / (n - k - 1.))
 
+
+    @property
+    def ms_err(self):
+        """Mean squared error the errors (residuals)."""
+        return self.ss_err / self.df_err
+
+
+    @property
+    def ms_reg(self):
+        """Mean squared error the regression (model)."""
+        return self.ss_reg / self.df_reg
+
+
+    @property
+    def fstat(self):
+        """F-statistic of the fully specified model."""
+        return self.ms_reg / self.ms_err
+
+
+    @property
+    def fstat_sig(self):
+        """p-value of the F-statistic."""
+        return 1. - scs.f.cdf(self.fstat, self.df_reg, self.df_err)
+  
+
+    @property 
+    @lru_cache(maxsize=None) 
+    def _se_all(self):
+        """Standard errors (SE) for all parameters, including the intercept."""
+        err = np.expand_dims(self.ms_err, axis=1)
+        t1 = np.diagonal(np.linalg.inv(np.matmul(self.xwins.swapaxes(1,2), 
+                                                 self.xwins)),
+                         axis1=1, axis2=2)
+        return np.squeeze(np.sqrt(t1 * err))
+
+
+    @property
+    def se_alpha(self):
+        """Standard errors (SE) of the intercept (alpha) only."""
+        return _handle_rolling_ab(self._se_all, self.use_const)[0]
+
+
+    @property
+    def se_beta(self):
+        """Standard errors (SE) of the parameters, excluding the intercept."""
+        return _handle_rolling_ab(self._se_all, self.use_const)[1]
+
+
+    @property
+    @lru_cache(maxsize=None)
+    def _tstat_all(self):
+        """The t-statistics of all parameters, incl. the intecept."""
+        return self.solution / self._se_all
+
+
+    @property
     def tstat_alpha(self):
-        return self._rolling_stat('tstat_alpha')
+        """The t-statistic of the intercept (alpha)."""
+        return _handle_rolling_ab(self._tstat_all, self.use_const)[0]
 
+
+    @property
     def tstat_beta(self):
-        return self._rolling_stat('tstat_beta')
+        """The t-statistics of the parameters, excl. the intecept."""
+        return _handle_rolling_ab(self._tstat_all, self.use_const)[1]
+
+
+    @property
+    @lru_cache(maxsize=None)
+    def _pvalues_all(self):
+        """Two-tailed p values for t-stats of all parameters."""
+        return 2. * (1. - scs.t.cdf(np.abs(self._tstat_all), self.df_err))
+
+
+    @property
+    def pvalues_alpha(self):
+        """Two-tailed p values for t-stats of the intercept only."""
+        return _handle_rolling_ab(self._pvalues_all, self.use_const)[0]
+
+
+    @property
+    def pvalues_beta(self):
+        """Two-tailed p values for t-stats of parameters, excl. intercept."""
+        return _handle_rolling_ab(self._pvalues_all, self.use_const)[1]
+
+
+    @property
+    def condition_number(self):
+        """Condition number of x; ratio of largest to smallest eigenvalue."""
+        ev = np.linalg.eig(np.matmul(self.xwins.swapaxes(1,2), self.xwins))[0]
+        return np.sqrt(ev.max(axis=1) / ev.min(axis=1))

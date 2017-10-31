@@ -2,7 +2,7 @@
 
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
-__all__ = ['OLS', 'RollingOLS']
+__all__ = ['OLS', 'RollingOLS', 'PandasRollingOLS']
 
 
 from collections import OrderedDict
@@ -390,7 +390,7 @@ class RollingOLS(object):
 
 
     @property
-    def alpha(self):
+    def _alpha(self):
         """The intercept term (alpha).
 
         Technically defined as the coefficient to a column vector of ones.
@@ -400,42 +400,42 @@ class RollingOLS(object):
 
 
     @property
-    def beta(self):
+    def _beta(self):
         """The parameters (coefficients), excl. the intercept."""
         return _handle_rolling_ab(self.solution, self.use_const)[1]
 
 
     @property
-    def df_tot(self):
+    def _df_tot(self):
         """Total degrees of freedom, n - 1."""
         return self.n - 1
 
 
     @property
-    def df_reg(self):
+    def _df_reg(self):
         """Model degrees of freedom. Equal to k."""
         return self.k
 
 
     @property
-    def df_err(self):
+    def _df_err(self):
         """Residual degrees of freedom. n - k - 1."""
         return self.n - self.k - 1
 
 
     @property
-    def std_err(self):
+    def _std_err(self):
         """Standard error of the estimate (SEE).  A scalar.
 
         For standard errors of parameters, see _se_all, se_alpha, and se_beta.
         """
-        return np.sqrt(np.sum(np.square(self.resids), axis=1)
-                       / self.df_err)
+        return np.sqrt(np.sum(np.square(self._resids), axis=1)
+                       / self._df_err)
 
 
     @property
     @lru_cache(maxsize=None)
-    def predicted(self):
+    def _predicted(self):
         """The predicted values of y ('yhat')."""
         return np.squeeze(np.matmul(self.xwins, np.expand_dims(self.solution, 
                                                           axis=-1)))
@@ -443,93 +443,94 @@ class RollingOLS(object):
 
     @property
     @lru_cache(maxsize=None)
-    def resids(self):
-        return self.ywins - self.predicted
+    def _resids(self):
+        return self.ywins - self._predicted
 
 
     @property
-    def jarque_bera(self):
-        return np.apply_along_axis(scs.jarque_bera, 1, self.resids)[:, 0]
+    def _jarque_bera(self):
+        return np.apply_along_axis(scs.jarque_bera, 1, self._resids)[:, 0]
 
 
     @property
-    def durbin_watson(self):
-        return np.sum(np.square(np.diff(self.resids))
-                      / np.expand_dims(self.ss_err, axis=-1), axis=1)
+    def _durbin_watson(self):
+        return np.sum(np.square(np.diff(self._resids))
+                      / np.expand_dims(self._ss_err, axis=-1), axis=1)
+
 
     @property
     @lru_cache(maxsize=None)
-    def ybar(self):
+    def _ybar(self):
         """The mean of y."""
         return self.ywins.mean(axis=1)
 
 
     @property
     @lru_cache(maxsize=None)
-    def ss_tot(self):
+    def _ss_tot(self):
         """Total sum of squares."""
-        return np.sum(np.square(self.ywins - np.expand_dims(self.ybar, 
+        return np.sum(np.square(self.ywins - np.expand_dims(self._ybar, 
                                                        axis=-1)), axis=1)
 
 
     @property
     @lru_cache(maxsize=None)
-    def ss_reg(self):
+    def _ss_reg(self):
         """Sum of squares of the regression."""
-        return np.sum(np.square(self.predicted
-                                - np.expand_dims(self.ybar, axis=1)), axis=1)
+        return np.sum(np.square(self._predicted
+                                - np.expand_dims(self._ybar, axis=1)), axis=1)
   
  
     @property 
     @lru_cache(maxsize=None)
-    def ss_err(self):
+    def _ss_err(self):
         """Sum of squares of the residuals (error sum of squares)."""
-        return np.sum(np.square(self.resids), axis=1)
+        return np.sum(np.square(self._resids), axis=1)
 
 
     @property
-    def rsq(self):
+    def _rsq(self):
         """The coefficent of determination, R-squared."""
-        return self.ss_reg / self.ss_tot
+        return self._ss_reg / self._ss_tot
 
 
     @property
-    def rsq_adj(self):
+    def _rsq_adj(self):
         """Adjusted R-squared."""
         n = self.n
         k = self.k
-        return 1. - ((1. - self.rsq) * (n - 1.) / (n - k - 1.))
+        return 1. - ((1. - self._rsq) * (n - 1.) / (n - k - 1.))
 
 
     @property
-    def ms_err(self):
+    def _ms_err(self):
         """Mean squared error the errors (residuals)."""
-        return self.ss_err / self.df_err
+        return self._ss_err / self._df_err
 
 
     @property
-    def ms_reg(self):
+    def _ms_reg(self):
         """Mean squared error the regression (model)."""
-        return self.ss_reg / self.df_reg
+        return self._ss_reg / self._df_reg
 
 
     @property
-    def fstat(self):
+    def _fstat(self):
         """F-statistic of the fully specified model."""
-        return self.ms_reg / self.ms_err
+        return self._ms_reg / self._ms_err
 
 
     @property
-    def fstat_sig(self):
+    def _fstat_sig(self):
         """p-value of the F-statistic."""
-        return 1. - scs.f.cdf(self.fstat, self.df_reg, self.df_err)
+        return 1. - scs.f.cdf(self._fstat, self._df_reg, self._df_err)
   
 
     @property 
     @lru_cache(maxsize=None) 
     def _se_all(self):
         """Standard errors (SE) for all parameters, including the intercept."""
-        err = np.expand_dims(self.ms_err, axis=1)
+        err = np.expand_dims(self._ms_err, axis=1)
         t1 = np.diagonal(np.linalg.inv(np.matmul(self.xwins.swapaxes(1,2), 
                                                  self.xwins)),
                          axis1=1, axis2=2)
@@ -537,13 +538,13 @@ class RollingOLS(object):
 
 
     @property
-    def se_alpha(self):
+    def _se_alpha(self):
         """Standard errors (SE) of the intercept (alpha) only."""
         return _handle_rolling_ab(self._se_all, self.use_const)[0]
 
 
     @property
-    def se_beta(self):
+    def _se_beta(self):
         """Standard errors (SE) of the parameters, excluding the intercept."""
         return _handle_rolling_ab(self._se_all, self.use_const)[1]
 
@@ -556,13 +557,13 @@ class RollingOLS(object):
 
 
     @property
-    def tstat_alpha(self):
+    def _tstat_alpha(self):
         """The t-statistic of the intercept (alpha)."""
         return _handle_rolling_ab(self._tstat_all, self.use_const)[0]
 
 
     @property
-    def tstat_beta(self):
+    def _tstat_beta(self):
         """The t-statistics of the parameters, excl. the intecept."""
         return _handle_rolling_ab(self._tstat_all, self.use_const)[1]
 
@@ -571,23 +572,392 @@ class RollingOLS(object):
     @lru_cache(maxsize=None)
     def _pvalues_all(self):
         """Two-tailed p values for t-stats of all parameters."""
-        return 2. * (1. - scs.t.cdf(np.abs(self._tstat_all), self.df_err))
+        return 2. * (1. - scs.t.cdf(np.abs(self._tstat_all), self._df_err))
 
 
     @property
-    def pvalues_alpha(self):
+    def _pvalues_alpha(self):
         """Two-tailed p values for t-stats of the intercept only."""
         return _handle_rolling_ab(self._pvalues_all, self.use_const)[0]
 
 
     @property
-    def pvalues_beta(self):
+    def _pvalues_beta(self):
         """Two-tailed p values for t-stats of parameters, excl. intercept."""
         return _handle_rolling_ab(self._pvalues_all, self.use_const)[1]
 
 
     @property
-    def condition_number(self):
+    def _condition_number(self):
         """Condition number of x; ratio of largest to smallest eigenvalue."""
         ev = np.linalg.eig(np.matmul(self.xwins.swapaxes(1,2), self.xwins))[0]
         return np.sqrt(ev.max(axis=1) / ev.min(axis=1))
+
+
+    #-------------------------------------------------------------------------
+    # "Public" results
+
+
+    @property
+    def alpha(self):
+        return self._alpha
+
+
+    @property
+    def beta(self):
+        return self._beta
+
+
+    @property
+    def df_tot(self):
+        """Total degrees of freedom, n - 1."""
+        return self._df_tot
+
+
+    @property
+    def df_reg(self):
+        """Model degrees of freedom. Equal to k."""
+        return self._df_reg
+
+
+    @property
+    def df_err(self):
+        """Residual degrees of freedom. n - k - 1."""
+        return self._df_err
+
+
+    @property
+    def std_err(self):
+        """Standard error of the estimate (SEE).  A scalar.
+
+        For standard errors of parameters, see _se_all, se_alpha, and se_beta.
+        """
+        return self._std_err
+
+
+    @property
+    def predicted(self):
+        """The predicted values of y ('yhat')."""
+        return self._predicted
+
+
+    @property
+    def resids(self):
+        return self._resids
+
+
+    @property
+    def jarque_bera(self):
+        return self._jarque_bera
+
+
+    @property
+    def durbin_watson(self):
+        return self._durbin_watson
+
+
+    @property
+    def ybar(self):
+        """The mean of y."""
+        return self._ybar
+
+
+    @property
+    def ss_tot(self):
+        """Total sum of squares."""
+        return self._ss_tot
+
+
+    @property
+    def ss_reg(self):
+        """Sum of squares of the regression."""
+        return self._ss_reg
+  
+ 
+    @property
+    def ss_err(self):
+        """Sum of squares of the residuals (error sum of squares)."""
+        return self._ss_err
+
+
+    @property
+    def rsq(self):
+        """The coefficent of determination, R-squared."""
+        return self._rsq
+
+
+    @property
+    def rsq_adj(self):
+        """Adjusted R-squared."""
+        return self._rsq_adj
+
+
+    @property
+    def ms_err(self):
+        """Mean squared error the errors (residuals)."""
+        return self._ms_err
+
+
+    @property
+    def ms_reg(self):
+        """Mean squared error the regression (model)."""
+        return self._ms_reg
+
+
+    @property
+    def fstat(self):
+        """F-statistic of the fully specified model."""
+        return self._f_stat
+
+
+    @property
+    def fstat_sig(self):
+        """p-value of the F-statistic."""
+        return self._fstat_sig
+
+
+    @property
+    def se_alpha(self):
+        """Standard errors (SE) of the intercept (alpha) only."""
+        return self._se_alpha
+
+
+    @property
+    def se_beta(self):
+        """Standard errors (SE) of the parameters, excluding the intercept."""
+        return self._se_beta
+
+
+    @property
+    def tstat_alpha(self):
+        """The t-statistic of the intercept (alpha)."""
+        return self._tstat_alpha
+
+
+    @property
+    def tstat_beta(self):
+        """The t-statistics of the parameters, excl. the intecept."""
+        return self._tstat_beta
+
+
+    @property
+    def pvalues_alpha(self):
+        """Two-tailed p values for t-stats of the intercept only."""
+        return self._pvalues_alpha
+
+
+    @property
+    def pvalues_beta(self):
+        """Two-tailed p values for t-stats of parameters, excl. intercept."""
+        return self._pvalues_beta
+
+
+    @property
+    def condition_number(self):
+        """Condition number of x; ratio of largest to smallest eigenvalue."""
+        return self._condition_number
+
+
+class PandasRollingOLS(RollingOLS):
+    def __init__(self, y, x=None, window=None, has_const=False, use_const=True,
+                 names=None):
+
+        # A little redundant needing to establish k...
+        if not names:
+            if x is None:
+                if hasattr(y, 'columns'):
+                    if has_const:
+                        names = y.columns[1:-1]
+                    else:
+                        names = y.columns[1:]
+                else:
+                    if has_const:
+                        k = y.shape[-1] - 2
+                    else:
+                        k = y.shape[-1] - 1
+                    names = ['feature{}'.format(i) for i in range(1,k+1)]
+            else:
+                if hasattr(x, 'columns'):
+                    if has_const:
+                        names = x.columns[1:-1]
+                    else:
+                        names = x.columns[1:]    
+                else:
+                    if has_const:
+                        k = x.shape[-1] - 1
+                    else:
+                        if x.ndim == 1:
+                            k = 1
+                        else:
+                            k = x.shape[-1]
+                    names = ['feature{}'.format(i) for i in range(1,k+1)]
+        self.names = names
+
+        super(PandasRollingOLS, self).__init__(y=y, x=x, window=window,
+                                               has_const=has_const, 
+                                               use_const=use_const)
+        
+        self.index = y.index
+        # Index for the rolling result starts at (window - 1)
+        self.ridx = y.index[window-1:]     
+
+
+    def _wrap_series(self, stat, name=None):
+        if name == None:
+            name = stat[1:]
+        return Series(getattr(self, stat), index=self.ridx, name=name)
+
+    def _wrap_dataframe(self, stat):
+        return DataFrame(getattr(self, stat), index=self.ridx, 
+                         columns=self.names)
+
+    def _wrap_multidx(self, stat, name=None):
+        if name == None:
+            name = stat[1:]
+        outer = np.repeat(self.ridx, self.window)
+        inner = np.ravel(utils.rolling_windows(self.index.values, 
+                                               window=self.window))
+        return Series(getattr(self, stat).flatten(), index=[outer, inner], 
+                      name=name).rename_axis(['end', 'subperiod'])
+
+    @property
+    def alpha(self):
+        return self._wrap_series(stat='_alpha', name='intercept')
+
+    @property
+    def beta(self):
+        return self._wrap_dataframe(stat='_beta')
+
+
+    # df_tot, df_reg, df_err are scalars; no override.
+
+
+    @property
+    def std_err(self):
+        """Standard error of the estimate (SEE).  A scalar.
+
+        For standard errors of parameters, see _se_all, se_alpha, and se_beta.
+        """
+        return self._wrap_series(stat='_std_err')
+
+
+    @property
+    def predicted(self):
+        """The predicted values of y ('yhat')."""
+        return self._wrap_multidx('_predicted')
+
+
+    @property
+    def resids(self):
+        return self._wrap_multidx('_resids')
+
+
+    @property
+    def jarque_bera(self):
+        return self._wrap_series(stat='_jarque_bera')
+
+
+    @property
+    def durbin_watson(self):
+        return self._wrap_series(stat='_durbin_watson')
+
+
+    @property
+    def ybar(self):
+        """The mean of y."""
+        return self._wrap_series(stat='_ybar')
+
+
+    @property
+    def ss_tot(self):
+        """Total sum of squares."""
+        return self._wrap_series(stat='_ss_tot')
+
+
+    @property
+    def ss_reg(self):
+        """Sum of squares of the regression."""
+        return self._wrap_series(stat='_ss_reg')
+  
+ 
+    @property
+    def ss_err(self):
+        """Sum of squares of the residuals (error sum of squares)."""
+        return self._wrap_series(stat='_ss_err')
+
+
+    @property
+    def rsq(self):
+        """The coefficent of determination, R-squared."""
+        return self._wrap_series(stat='_rsq')
+
+
+    @property
+    def rsq_adj(self):
+        """Adjusted R-squared."""
+        return self._wrap_series(stat='_rsq_adj')
+
+    @property
+    def ms_err(self):
+        """Mean squared error the errors (residuals)."""
+        return self._wrap_series(stat='_ms_err')
+
+
+    @property
+    def ms_reg(self):
+        """Mean squared error the regression (model)."""
+        return self._wrap_series(stat='_ms_reg')
+
+
+    @property
+    def fstat(self):
+        """F-statistic of the fully specified model."""
+        return self._wrap_series(stat='_fstat')
+
+
+    @property
+    def fstat_sig(self):
+        """p-value of the F-statistic."""
+        return self._wrap_series(stat='_fstat_sig')
+
+
+    @property
+    def se_alpha(self):
+        """Standard errors (SE) of the intercept (alpha) only."""
+        return self._wrap_series(stat='_se_alpha')
+
+
+    @property
+    def se_beta(self):
+        """Standard errors (SE) of the parameters, excluding the intercept."""
+        return self._wrap_dataframe(stat='_se_beta')
+
+
+    @property
+    def tstat_alpha(self):
+        """The t-statistic of the intercept (alpha)."""
+        return self._wrap_series(stat='_tstat_alpha')
+
+
+    @property
+    def tstat_beta(self):
+        """The t-statistics of the parameters, excl. the intecept."""
+        return self._wrap_dataframe(stat='_tstat_beta')
+
+
+    @property
+    def pvalues_alpha(self):
+        """Two-tailed p values for t-stats of the intercept only."""
+        return self._wrap_series(stat='_pvalues_alpha')
+
+
+    @property
+    def pvalues_beta(self):
+        """Two-tailed p values for t-stats of parameters, excl. intercept."""
+        return self._wrap_dataframe(stat='_pvalues_beta')
+
+
+    @property
+    def condition_number(self):
+        """Condition number of x; ratio of largest to smallest eigenvalue."""
+        return self._wrap_series(stat='_condition_number')

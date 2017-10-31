@@ -29,7 +29,6 @@ variance_inflation_factor
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
-
 __all__ = [
     'activeshare', 'amortize', 'BestFitDist', 'corr_heatmap',
     'ewm_params', 'ewm_weights', 'ewm_bootstrap', 'factor_loadings', 'PCA',
@@ -47,7 +46,7 @@ from pandas import DataFrame, Series
 from pandas.tseries import offsets
 import scipy.optimize as sco
 import scipy.stats as scs
-import seaborn.apionly as sns
+import seaborn as sns
 from sklearn.preprocessing import scale
 from sklearn.utils.extmath import svd_flip
 

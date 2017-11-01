@@ -778,9 +778,9 @@ class PandasRollingOLS(RollingOLS):
             else:
                 if hasattr(x, 'columns'):
                     if has_const:
-                        names = x.columns[1:-1]
+                        names = x.columns[:-1]
                     else:
-                        names = x.columns[1:]    
+                        names = x.columns    
                 else:
                     if has_const:
                         k = x.shape[-1] - 1

@@ -5,7 +5,6 @@ __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 __all__ = ['OLS', 'RollingOLS', 'PandasRollingOLS']
 
 
-from collections import OrderedDict
 from functools import lru_cache
 
 import numpy as np

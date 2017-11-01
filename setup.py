@@ -30,7 +30,7 @@ setup(
         'requests >= 2.11.1',
         'xlrd >= 0.5.4',
         'statsmodels >= 0.6.0'
-        ],
+        ],  # TODO: update
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

@@ -1,4 +1,5 @@
-"""Python package designed for financial analysis of security returns.
+"""Python package designed for general financial and security returns analysis.
+
 
 Modules
 =======

@@ -802,7 +802,7 @@ class PandasRollingOLS(RollingOLS):
 
 
     def _wrap_series(self, stat, name=None):
-        if name == None:
+        if name is None:
             name = stat[1:]
         return Series(getattr(self, stat), index=self.ridx, name=name)
 
@@ -811,7 +811,7 @@ class PandasRollingOLS(RollingOLS):
                          columns=self.names)
 
     def _wrap_multidx(self, stat, name=None):
-        if name == None:
+        if name is None:
             name = stat[1:]
         outer = np.repeat(self.ridx, self.window)
         inner = np.ravel(utils.rolling_windows(self.index.values, 

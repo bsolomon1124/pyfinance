@@ -1,17 +1,16 @@
+from codecs import open as _open
+import os
 from setuptools import setup, find_packages
 
 
-long_description = """Python package designed for general financial and security returns analysis.
+# __file__ is the pathname of the file from which the module was loaded.
+# `here` will be something like 'C:\Users\bsolomon\anaconda3\pyfinance'.
+here = os.path.abspath(os.path.dirname(__file__))
 
-Modules
-=======
-- datasets : Financial dataset web scrubbing
-- general : Generalized tools for financial analysis & quantitative finance
-- ols : Ordinary least squares regression (static & rolling cases)
-- options : European option valuation and strategy visualization
-- returns : Statistical analysis of time series security returns data
-- utils : Basic utilities and helper functions
-"""
+# Get the long description from the README file
+with _open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
+    long_description = f.read()
+
 
 setup(
     name='pyfinance',
@@ -23,14 +22,20 @@ setup(
     url='https://github.com/bsolomon1124/pyfinance',
     license='MIT',
     install_requires=[
-        'Pandas >= 0.20.1',
-        'Numpy >= 0.7.0',
+        'bs4 >= 4.6.0',
         'Matplotlib >= 1.1',
-        'scipy >= 0.10.0',
+        'Numpy >= 0.7.0',
+        'pandas_datareader >= 0.5.0',
+        'Pandas >= 0.20.1',
         'requests >= 2.11.1',
+        'scipy >= 0.10.0',
+        'seaborn >= 0.8.0',
+        'selenium >= 3.5.0',
+        'sklearn >= 0.18.0',
+        'statsmodels >= 0.6.0',
         'xlrd >= 0.5.4',
-        'statsmodels >= 0.6.0'
-        ],  # TODO: update
+        'xmltodict >= 0.10.0'        
+        ],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
@@ -41,7 +46,17 @@ setup(
         'Topic :: Office/Business :: Financial :: Investment',
         'Topic :: Scientific/Engineering :: Information Analysis'
         ],
-    keywords='finance investment analysis regression options securities CAPM',
+    keywords=[
+        'finance',
+        'investment', 
+        'analysis', 
+        'regression', 
+        'options',
+        'securities', 
+        'CAPM',
+        'machine learning',
+        'risk'
+        ],
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
     python_requires='>=3'
     )

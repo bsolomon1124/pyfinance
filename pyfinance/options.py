@@ -339,7 +339,7 @@ class OpStrat(object):
 
 class Straddle(OpStrat):
     """Long-volatility exposure.  Long a put and call, both at K."""
-    def __init__(self, St=None, K=None, callprice=None, putprice):
+    def __init__(self, St=None, K=None, callprice=None, putprice=None):
         OpStrat.__init__(self, St=St)
         self.K = K
         self.price = price

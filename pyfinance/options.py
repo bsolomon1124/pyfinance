@@ -35,10 +35,10 @@ Option strategies inheritance hierarchy:
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 __all__ = [
-    'BSM', 'Call', 'Put', 'OpStrat', 'Straddle', 'ShortStraddle', 'Strangle', 
-    'ShortStrangle', 'Strip', 'Strap', 'BullSpread', 'BearSpread', 
-    'LongPutLadder', 'ShortPutLadder', 'LongButterfly', 'ShortButterfly', 
-    'LongIronButterfly', 'ShortIronButterfly', 'LongCondor', 'ShortCondor', 
+    'BSM', 'Call', 'Put', 'OpStrat', 'Straddle', 'ShortStraddle', 'Strangle',
+    'ShortStrangle', 'Strip', 'Strap', 'BullSpread', 'BearSpread',
+    'LongPutLadder', 'ShortPutLadder', 'LongButterfly', 'ShortButterfly',
+    'LongIronButterfly', 'ShortIronButterfly', 'LongCondor', 'ShortCondor',
     'LongIronCondor', 'ShortIronCondor'
     ]
 
@@ -332,7 +332,7 @@ class OpStrat(object):
 
     def diagram(self, start=None, stop=None, St=None, **kwargs):
         """Plot `grid`."""
-        St, payoffs, profits = self.grid(start=start, stop=stop, St=St, 
+        St, payoffs, profits = self.grid(start=start, stop=stop, St=St,
                                          **kwargs)
         plt.plot(St, payoffs, St, profits)
 
@@ -342,7 +342,6 @@ class Straddle(OpStrat):
     def __init__(self, St=None, K=None, callprice=None, putprice=None):
         OpStrat.__init__(self, St=St)
         self.K = K
-        self.price = price
         self.add_option(K=K, price=callprice, St=St, kind='call')
         self.add_option(K=K, price=putprice, St=St, kind='put')
 
@@ -451,7 +450,7 @@ class LongPutLadder(BearSpread):
     """Bear put spread combined with selling another lower-strike put."""
     def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
                  price2=None, price3=None):
-        BearSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2, 
+        BearSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2,
                             price2=price3)
         self.K1 = K1
         self.price1 = price1
@@ -462,7 +461,7 @@ class ShortPutLadder(BearSpread):
     """Bull put spread combined with buying another lower-strike put."""
     def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
                  price2=None, price3=None):
-        BullSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2, 
+        BullSpread.__init__(self, St=St, K1=K2, K2=K3, price1=price2,
                             price2=price3,
                             kind='put')
         self.K1 = K1

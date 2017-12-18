@@ -15,7 +15,7 @@ from statsmodels.tools import add_constant
 from pyfinance import utils
 
 
-# TODO: 
+# TODO:
 # - constrained regression case, preferably with cvxopt
 # - confidence intervals
 # - deal with problem of unneeded dimensionality (np.squeeze).  For
@@ -26,7 +26,7 @@ from pyfinance import utils
 def _rolling_lstsq(x, y):
     """Finds solution for the rolling case.  Matrix formulation."""
     return np.squeeze(np.matmul(np.linalg.inv(np.matmul(x.swapaxes(1,2), x)),
-                      np.matmul(x.swapaxes(1,2), np.atleast_3d(y))))    
+                      np.matmul(x.swapaxes(1,2), np.atleast_3d(y))))
 
 
 def _confirm_constant(a):
@@ -34,14 +34,14 @@ def _confirm_constant(a):
     return np.any(np.equal(np.ptp(a, axis=0), 1.))
 
 
-def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05, 
+def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05,
                            atol=1e-08):
     """Helper func to interaction between has_const and use_const params.
 
     has_const   use_const   outcome
     ---------   ---------   -------
     True        True        Confirm that a has constant; return a
-    False       False       Confirm that a doesn't have constant; return a 
+    False       False       Confirm that a doesn't have constant; return a
     False       True        Confirm that a doesn't have constant; add constant
     True        False       ValueError
     """
@@ -97,10 +97,10 @@ def _clean_xy(y, x=None, has_const=False, use_const=True):
         x = y[:, 1:]
         y = y[:, 0]
 
-    k, x = _check_constant_params(x, has_const=has_const, 
+    k, x = _check_constant_params(x, has_const=has_const,
                                             use_const=use_const)
     y = np.squeeze(y)
-    x = np.atleast_2d(x)        
+    x = np.atleast_2d(x)
     assert y.ndim == 1 and x.ndim > 1
     return x, y, k
 
@@ -140,7 +140,7 @@ class OLS(object):
     def __init__(self, y, x=None, has_const=False, use_const=True):
         self.x, self.y, self.k = _clean_xy(y, x)
         self.n = y.shape[0]
-                
+
         # np.lstsq(a,b): Solves the equation a x = b by computing a vector x
         # TODO: throws LinAlgError for 1d x, has_const=False, use_const=False.
         #       np.linalg.lstsq specifies `a` must be (M,N).
@@ -156,7 +156,7 @@ class OLS(object):
 
         Technically defined as the coefficient to a column vector of ones.
         """
-        
+
         return _handle_ab(self.solution, self.use_const)[0]
 
 
@@ -301,7 +301,7 @@ class OLS(object):
         """Sum of squares of the regression."""
         return  np.sum(np.square(self.predicted - self.ybar), axis=0)
 
-    
+
     @property
     def ss_err(self):
         """Sum of squares of the residuals (error sum of squares)."""
@@ -436,7 +436,7 @@ class RollingOLS(object):
     @lru_cache(maxsize=None)
     def _predicted(self):
         """The predicted values of y ('yhat')."""
-        return np.squeeze(np.matmul(self.xwins, np.expand_dims(self.solution, 
+        return np.squeeze(np.matmul(self.xwins, np.expand_dims(self.solution,
                                                           axis=-1)))
 
 
@@ -468,7 +468,7 @@ class RollingOLS(object):
     @lru_cache(maxsize=None)
     def _ss_tot(self):
         """Total sum of squares."""
-        return np.sum(np.square(self.ywins - np.expand_dims(self._ybar, 
+        return np.sum(np.square(self.ywins - np.expand_dims(self._ybar,
                                                        axis=-1)), axis=1)
 
 
@@ -478,9 +478,9 @@ class RollingOLS(object):
         """Sum of squares of the regression."""
         return np.sum(np.square(self._predicted
                                 - np.expand_dims(self._ybar, axis=1)), axis=1)
-  
- 
-    @property 
+
+
+    @property
     @lru_cache(maxsize=None)
     def _ss_err(self):
         """Sum of squares of the residuals (error sum of squares)."""
@@ -523,14 +523,14 @@ class RollingOLS(object):
     def _fstat_sig(self):
         """p-value of the F-statistic."""
         return 1. - scs.f.cdf(self._fstat, self._df_reg, self._df_err)
-  
 
-    @property 
-    @lru_cache(maxsize=None) 
+
+    @property
+    @lru_cache(maxsize=None)
     def _se_all(self):
         """Standard errors (SE) for all parameters, including the intercept."""
         err = np.expand_dims(self._ms_err, axis=1)
-        t1 = np.diagonal(np.linalg.inv(np.matmul(self.xwins.swapaxes(1,2), 
+        t1 = np.diagonal(np.linalg.inv(np.matmul(self.xwins.swapaxes(1,2),
                                                  self.xwins)),
                          axis1=1, axis2=2)
         return np.squeeze(np.sqrt(t1 * err))
@@ -671,8 +671,8 @@ class RollingOLS(object):
     def ss_reg(self):
         """Sum of squares of the regression."""
         return self._ss_reg
-  
- 
+
+
     @property
     def ss_err(self):
         """Sum of squares of the residuals (error sum of squares)."""
@@ -706,7 +706,7 @@ class RollingOLS(object):
     @property
     def fstat(self):
         """F-statistic of the fully specified model."""
-        return self._f_stat
+        return self._fstat
 
 
     @property
@@ -780,7 +780,7 @@ class PandasRollingOLS(RollingOLS):
                     if has_const:
                         names = x.columns[:-1]
                     else:
-                        names = x.columns    
+                        names = x.columns
                 else:
                     if has_const:
                         k = x.shape[-1] - 1
@@ -793,12 +793,12 @@ class PandasRollingOLS(RollingOLS):
         self.names = names
 
         super(PandasRollingOLS, self).__init__(y=y, x=x, window=window,
-                                               has_const=has_const, 
+                                               has_const=has_const,
                                                use_const=use_const)
-        
+
         self.index = y.index
         # Index for the rolling result starts at (window - 1)
-        self.ridx = y.index[window-1:]     
+        self.ridx = y.index[window-1:]
 
 
     def _wrap_series(self, stat, name=None):
@@ -807,16 +807,16 @@ class PandasRollingOLS(RollingOLS):
         return Series(getattr(self, stat), index=self.ridx, name=name)
 
     def _wrap_dataframe(self, stat):
-        return DataFrame(getattr(self, stat), index=self.ridx, 
+        return DataFrame(getattr(self, stat), index=self.ridx,
                          columns=self.names)
 
     def _wrap_multidx(self, stat, name=None):
         if name is None:
             name = stat[1:]
         outer = np.repeat(self.ridx, self.window)
-        inner = np.ravel(utils.rolling_windows(self.index.values, 
+        inner = np.ravel(utils.rolling_windows(self.index.values,
                                                window=self.window))
-        return Series(getattr(self, stat).flatten(), index=[outer, inner], 
+        return Series(getattr(self, stat).flatten(), index=[outer, inner],
                       name=name).rename_axis(['end', 'subperiod'])
 
     @property
@@ -877,8 +877,8 @@ class PandasRollingOLS(RollingOLS):
     def ss_reg(self):
         """Sum of squares of the regression."""
         return self._wrap_series(stat='_ss_reg')
-  
- 
+
+
     @property
     def ss_err(self):
         """Sum of squares of the residuals (error sum of squares)."""

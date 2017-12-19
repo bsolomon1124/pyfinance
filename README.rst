@@ -1,7 +1,7 @@
 pyfinance
 =========
 
-Python package designed for general financial and security returns analysis.
+Python package designed for security returns analysis.
 
 Work in progress; docs forthcoming. Feedback appreciated.
 

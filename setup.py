@@ -16,7 +16,7 @@ setup(
     name='pyfinance',
     description='Python package designed for security returns analysis.',
     long_description=long_description,
-    version='0.1.4',
+    version='0.1.5',
     author='Brad Solomon',
     author_email='brad.solomon.1124@gmail.com',
     url='https://github.com/bsolomon1124/pyfinance',
@@ -59,6 +59,6 @@ setup(
         'machine learning',
         'risk'
         ],
-    packages=find_packages('pyfinance'),
+    packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
     python_requires='>=3'
     )

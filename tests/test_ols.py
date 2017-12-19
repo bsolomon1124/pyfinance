@@ -189,7 +189,7 @@ def test_ols():
 # Rather than checking each rolling period we check [0] and [-1] pos.
 # ---------------------------------------------------------------------
 
-pred = {
+rpred = {
     '1d': {
         'start':
             np.array([  92.316,  144.489,  -40.55 ,  -51.728,   21.597,  176.019,
@@ -220,7 +220,7 @@ pred = {
         }
     }
 
-resid = {
+rresid = {
     '1d': {
         'start':
             np.array([ -76.146,  -43.304, -203.232,   46.166,  -60.177,  193.202,
@@ -251,7 +251,7 @@ resid = {
         }
     }
 
-targets = {
+rtargets = {
     '1d': {
         'start': {
             'alpha': -5.037450748,
@@ -263,10 +263,10 @@ targets = {
             'fstat_sig': 6.92852E-05,
             'ms_err': 9374.380222,
             'ms_reg': 219656.9334,
-            'predicted': pred['1d']['start'],
+            'predicted': rpred['1d']['start'],
             'pvalue_alpha': 0.7971472,
             'pvalue_beta': 6.92852E-05,
-            'resids': resid['1d']['start'],
+            'resids': rresid['1d']['start'],
             'rsq': 0.504647931,
             'rsq_adj': 0.483110885,
             'se_alpha': 19.37188279,
@@ -289,10 +289,10 @@ targets = {
             'fstat_sig': 1.32E-06,
             'ms_err': 6684.632025,
             'ms_reg': 280262.5077,
-            'predicted': pred['1d']['end'],
+            'predicted': rpred['1d']['end'],
             'pvalue_alpha': 0.012808213,
             'pvalue_beta': 1.316E-06,
-            'resids': resid['1d']['end'],
+            'resids': rresid['1d']['end'],
             'rsq': 0.64575269,
             'rsq_adj': 0.630350633,
             'se_alpha': 16.67364217,
@@ -317,10 +317,10 @@ targets = {
             'fstat_sig': 0.000390369,
             'ms_err': 9693.215531,
             'ms_reg': 111008.4684,
-            'predicted': pred['2d']['start'],
+            'predicted': rpred['2d']['start'],
             'pvalue_alpha': 0.625229391,
             'pvalue_beta': np.array([0.000134913, 0.626601084]),
-            'resids': resid['2d']['start'],
+            'resids': rresid['2d']['start'],
             'rsq': 0.51006989,
             'rsq_adj': 0.465530789,
             'se_alpha': 24.24260736,
@@ -343,10 +343,10 @@ targets = {
             'fstat_sig': 7.37058E-06,
             'ms_err': 6737.291736,
             'ms_reg': 142894.3131,
-            'predicted': pred['2d']['end'],
+            'predicted': rpred['2d']['end'],
             'pvalue_alpha': 0.364800613,
             'pvalue_beta': np.array([1.29506E-05, 0.374925765]),
-            'resids': resid['2d']['end'],
+            'resids': rresid['2d']['end'],
             'rsq': 0.658485416,
             'rsq_adj': 0.627438636,
             'se_alpha': 27.40008118,
@@ -362,7 +362,7 @@ targets = {
         }
     }
 
-models = {
+rmodels = {
     'model_1dy_1dx': RollingOLS(y=y1, x=x1, window=WINDOW),
     'model_1dy_2dx': RollingOLS(y=y1, x=x2, window=WINDOW),
     'model_2dy_2dx': RollingOLS(y=y2, x=x2, window=WINDOW)
@@ -370,33 +370,33 @@ models = {
 
 
 def test_rolling_ols():
-    for name, model in models.items():
+    for name, model in rmodels.items():
         if name.endswith('1dx'):
-            for k, v in targets['1d']['start'].items():
+            for k, v in rtargets['1d']['start'].items():
                 try:
                     attr = getattr(model, k)[0]
                 except:
                     attr = getattr(model, k)
-                assert np.allclose(v, getattr(model, k), rtol=RTOL)
-            for k, v in targets['1d']['end'].items():
+                assert np.allclose(v, attr, rtol=RTOL)
+            for k, v in rtargets['1d']['end'].items():
                 try:
                     attr = getattr(model, k)[-1]
                 except:
                     attr = getattr(model, k)
-                assert np.allclose(v, getattr(model, k), rtol=RTOL)
+                assert np.allclose(v, attr, rtol=RTOL)
         elif name.endswith('2dx'):
-            for k, v in targets['2d']['start'].items():
+            for k, v in rtargets['2d']['start'].items():
                 try:
                     attr = getattr(model, k)[0]
                 except:
                     attr = getattr(model, k)
-                assert np.allclose(v, getattr(model, k), rtol=RTOL)
-            for k, v in targets['2d']['end'].items():
+                assert np.allclose(v, attr, rtol=RTOL)
+            for k, v in rtargets['2d']['end'].items():
                 try:
                     attr = getattr(model, k)[-1]
                 except:
                     attr = getattr(model, k)
-                assert np.allclose(v, getattr(model, k), rtol=RTOL)
+                assert np.allclose(v, attr, rtol=RTOL)
 
 
 def test_pandas_rolling_ols():

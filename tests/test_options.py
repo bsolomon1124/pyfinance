@@ -46,9 +46,9 @@ def test_BSM():
     for name, option in options.items():
         for k, v in target[name].items():
             if isinstance(getattr(option, k), types.MethodType):
-                assert np.allclose(v, getattr(option, k)(), rtol=RTOL):
+                assert np.allclose(v, getattr(option, k)(), rtol=RTOL)
             else:
-                assert np.allclose(v, getattr(option, k), rtol=RTOL):
+                assert np.allclose(v, getattr(option, k), rtol=RTOL)
 
 # Put/call
 # ---------------------------------------------------------------------

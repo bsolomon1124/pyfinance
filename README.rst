@@ -9,6 +9,6 @@ New to PyPI as of Nov 2, 2017.
 
 Recommended install:
 
-```bash
+```
 $ conda install pyfinance
 ```

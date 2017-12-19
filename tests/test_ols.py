@@ -8,13 +8,10 @@
 # - 2d x, 1d y
 # - 2d x, 2dy (empty dimension, squeezed later)
 
-# import os
-
 import numpy as np
 import pandas as pd
 from sklearn.datasets import make_regression
 
-# os.chdir('/Users/brad/Scripts/python/projects/pyfinance/')
 from pyfinance.ols import OLS, RollingOLS
 
 RTOL = 1e-03

@@ -8,16 +8,13 @@
 #   Don M. Chance, PhD, CFA, ©2003 CFA Institute
 
 import types
-import os
 
 import numpy as np
 import pandas as pd
 
-np.random.seed(123)
-os.chdir('/Users/brad/Scripts/python/projects/pyfinance/')
-
 from pyfinance.options import *
 
+np.random.seed(123)
 RTOL = 1e-03
 
 # BSM

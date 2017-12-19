@@ -1,23 +1,22 @@
-from codecs import open as _open
+from codecs import open as op
 import os
 from setuptools import setup, find_packages
 
 
 # __file__ is the pathname of the file from which the module was loaded.
-# `here` will be something like 'C:\Users\bsolomon\anaconda3\pyfinance'.
+# `here` will be something like '~/.../anaconda3/pyfinance'.
 here = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
-with _open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
+with op(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 
 setup(
     name='pyfinance',
-    description='Python package designed for general financial'
-                ' and security returns analysis.',
+    description='Python package designed for security returns analysis.',
     long_description=long_description,
-    version='0.1.3',
+    version='0.1.4',
     author='Brad Solomon',
     author_email='brad.solomon.1124@gmail.com',
     url='https://github.com/bsolomon1124/pyfinance',
@@ -38,6 +37,8 @@ setup(
         'xlrd >= 0.5.4',
         'xmltodict >= 0.10.0'
         ],
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
@@ -59,6 +60,6 @@ setup(
         'machine learning',
         'risk'
         ],
-    packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
+    packages=find_packages('pyfinance'),
     python_requires='>=3'
     )

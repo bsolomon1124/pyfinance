@@ -131,8 +131,8 @@ dtype: float64
 
 # TODO: the main shortcoming of this module is that it only supports a
 #     1-benchmark case.  (Using >1 securities with >1 benchmarks would require
-#     taking a cartesian product of the two sets.)  It's doable (the result 
-#     could be a DataFrame with MultiIndex columns), but the module wasn't 
+#     taking a cartesian product of the two sets.)  It's doable (the result
+#     could be a DataFrame with MultiIndex columns), but the module wasn't
 #     designed as such to start.
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
@@ -168,19 +168,19 @@ from pyfinance import datasets, general, ols, utils
 
 _defaultdocs = {
 
-    'r' :
+    'r':
     """
     r : Series or DataFrame
         The core time series of periodic returns.  May be a single security
         (column vector) or multiple securities""",
 
-    'benchmark' :
+    'benchmark':
     """
     benchmark : Series or single-column DataFrame
         The time series of periodic returns for the benchmark.  Must be a
         single security""",
 
-    'window' :
+    'window':
     """
     window : int or offset, default None
         Size of the moving window. This is the number of observations used for
@@ -191,7 +191,7 @@ _defaultdocs = {
         `window` is None (default), the statistic is calculated over the full
         sample""",
 
-    'anlz' :
+    'anlz':
     """
     anlz : bool, default True
         If True, annualize the returned values by applying an annualization
@@ -199,37 +199,37 @@ _defaultdocs = {
         annualization factors are as follows (with `freq` as keys):
         {'D' : 252., 'W' : 52., 'M' : 12., 'Q' : 4., 'A' : 1.}""",
 
-    'method' :
+    'method':
     """
     method : str
         One of ('geo', 'geometric', 'arith', 'arithmetic, 'cum', 'cumulative').
         Specify use of either arithmetic or geometric means and differences.
         'Cumulative' will not apply to all functions in this module""",
 
-    'ddof' :
+    'ddof':
     """
     ddof : str or int, default 1
         The degrees of freedom {'sample' (1), 'population' or 'pop' (0)}""",
 
-    'log' :
+    'log':
     """
     log : bool, default False
         If False, use geometric methodology; if True, use continuous
         compounding with natural logarithm""",
 
-    'thresh' :
+    'thresh':
     """
     thresh : float or 'mean', default 0.0
         The cutoff filter on which to test and filter `benchmark` returns.
         If 'mean', the arithmetic mean of `benchmark` will be used.  In some
         statistics this is analogous to the Minimum Acceptable Return (MAR)""",
 
-    'base' :
+    'base':
     """
     base : float, default 1.0
         Within return indices, the initial (anchoring) value""",
 
-    'rf' :
+    'rf':
     """
     rf : float, default 0.0; or str, one of ('mean')
         The risk-free rate to utilize.  See the `load_rf` function within
@@ -239,7 +239,7 @@ _defaultdocs = {
         - If a string is given, this is passed to the `source` keyword of
           `load_rf`.  Valid sources are ('fred', 'factset'/'fs').""",
 
-    'reload' :
+    'reload':
     """
     reload : bool, default False
         Passed to `load_rf` is `rf` is a string (source).  Specifies whether to
@@ -249,6 +249,7 @@ _defaultdocs = {
 
 # `prep`: uses `.pipe` to chain together several convenience functions
 # -----------------------------------------------------------------------------
+
 
 def prep(r, freq=None, name=None, in_format='num'):
     """Prep raw returns to create compatability with returns functions.
@@ -295,11 +296,12 @@ def prep(r, freq=None, name=None, in_format='num'):
              .pipe(check_format, in_format=in_format)
              .pipe(num_to_dec, in_format=in_format)
              .pipe(series_to_frame, name=name)
-           )
+            )
 
 
 # Funcs to be called by `pipe` for 'prepping' return streams to uniform format
 # -----------------------------------------------------------------------------
+
 
 def add_freq(r, freq=None):
     """Add a frequency attribute to r.index, through inference or directly."""
@@ -340,7 +342,7 @@ def check_format(r, in_format='num'):
     """Logic check on proper specification of in_format."""
     freq = r.index.freq.freqstr
     thresh = 1.0
-    avg = r.values.mean() # use .values to collapse axis
+    avg = r.values.mean()  # use .values to collapse axis
     std = r.values.std()
 
     if in_format == 'num' and std * np.sqrt(utils.convertfreq(freq)) < thresh:
@@ -358,6 +360,7 @@ def check_format(r, in_format='num'):
 #     NumPy functions are used wherever possible for compatability with both
 #     numpy.ndarrays and pandas Series/DataFrames.
 # ----------------------------------------------------------------------------
+
 
 @utils.appender(_defaultdocs)
 def return_relatives(r, log=False):
@@ -416,7 +419,7 @@ def cumulative_return(r, anlz=True, method='arithmetic', log=False):
 
     # TODO: this func needs cleaned up conceptually.  Does it really make sense
     #     to multiply geometric returns?  (not log-relative-geometric).  Some
-    #     param combinations should be explicitly forbidden.  log=True should 
+    #     param combinations should be explicitly forbidden.  log=True should
     #     probably necessitate method='arithmetic'.
 
     if log:
@@ -426,7 +429,7 @@ def cumulative_return(r, anlz=True, method='arithmetic', log=False):
 
     if anlz:
         freq = r.index.freq.freqstr
-        yrs = 1. / ( r.count() / utils.convertfreq(freq) )
+        yrs = 1. / (r.count() / utils.convertfreq(freq))
         if method in ['geo', 'geometric']:
             res = res ** yrs
         elif method in ['arith', 'arithmetic']:
@@ -499,7 +502,7 @@ def cond_correl(r, benchmark, ddof=1):
     #     matrix calc'd.
 
     sigma = stdev(benchmark, anlz=False, ddof=ddof)[0]
-    mu = benchmark.mean()[0] # TODO: geometric mean?
+    mu = benchmark.mean()[0]  # TODO: geometric mean?
 
     breakpoints = mu + np.array([-2., -1., 1., 2.]) * sigma
     breakpoints = np.pad(breakpoints, 1, mode='constant',
@@ -517,6 +520,7 @@ def cond_correl(r, benchmark, ddof=1):
 
     return corrs
 
+
 @utils.appender(_defaultdocs)
 def cross_corr(r, window=None):
     """Average pairwise cross-correlation.
@@ -530,16 +534,19 @@ def cross_corr(r, window=None):
     if window:
         r = r.rolling(window=window)
     corr = r.corr()
+
     def _cc(mat):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', category=RuntimeWarning)
             return np.nanmean(mat.values[np.triu_indices_from(mat.values, 1)])
+
     if window:
         res = corr.groupby(corr.index.get_level_values(0)).apply(_cc)
     else:
         res = _cc(corr)
 
     return res
+
 
 @utils.appender(_defaultdocs)
 def covar(r, benchmark, window=None, ddof=1):
@@ -594,6 +601,7 @@ def jarque_bera(r, normal_kurtosis=0.0):
 # Grouped here (1) in order of dependency and then (2) alphabetically.
 # ----------------------------------------------------------------------------
 
+
 @utils.appender(_defaultdocs)
 def bias_ratio(r, anlz=True, ddof=1):
     """Measures how far returns are from an unbiased distribution.
@@ -622,7 +630,7 @@ def sharpe_ratio(r, anlz=True, ddof=1, rf=None, method='geometric',
     standard deviation.
     """
 
-    # TODO: 
+    # TODO:
     # - Automatic de-annualization for periods <1 yr
     #       (but maybe you want to keep this manual).
     # - Rolling
@@ -680,7 +688,7 @@ def msquared(r, benchmark, anlz=True, ddof=1, method='geometric',
     else:
         raise ValueError('`type(rf)` must be in (None, int, float)')
 
-    return ( (ri - rf) / (sm / si) ) + rf
+    return ((ri - rf) / (sm / si)) + rf
 
 
 def rollup(r, log=False, out_freq='Q'):
@@ -701,14 +709,12 @@ def rollup(r, log=False, out_freq='Q'):
         Includes 'D', 'W', 'M', 'Q', 'A'
     """
 
-    freq = r.index.freq.freqstr
-    if __frqs__[out_freq] > utils.convertfreq(freq):
-        raise ValueError('Cannot upsample a frequency from %s to %s'
-                         % (freq, out_freq))
-    else:
-        return (r.groupby(pd.Grouper(freq=out_freq))
-                 .apply(cumulative_return, method='cumulative',
-                        anlz=False, log=log))
+    # freq = r.index.freq.freqstr
+    # TODO: check that we are not upsampling a frequency
+    # TODO: use `.resample` rather than groupby + pd.Gropuer
+    return (r.groupby(pd.Grouper(freq=out_freq))
+             .apply(cumulative_return, method='cumulative',
+                    anlz=False, log=log))
 
 
 def max_drawdown(r, log=False, full_stats=True):
@@ -750,13 +756,13 @@ def max_drawdown(r, log=False, full_stats=True):
         end = dd.apply(lambda col: col.argmin())
         start = [dd_start(dd[i], j) for i, j in zip(dd.columns, end.values)]
         recov = [dd_recov(dd[i], j) for i, j in zip(dd.columns, end.values)]
-        mdd = DataFrame({'max_dd' : mdd, 'end' : end, 'start' : start,
-                         'recov_days' : recov},
+        mdd = DataFrame({'max_dd': mdd, 'end': end, 'start': start,
+                         'recov_days': recov},
                         index=r.columns)
         mdd.loc[:, 'duration_days'] = mdd.end - mdd.start
         mdd.loc[:, 'recov'] = mdd.end + mdd.recov_days
         mdd = mdd[['max_dd', 'start', 'end', 'recov', 'duration_days',
-                 'recov_days']]
+                   'recov_days']]
 
     return mdd
 
@@ -770,7 +776,7 @@ def calmar_ratio(r, anlz=True, log=False):
 
     # TODO: clean up params
     return cumulative_return(r, anlz=anlz) \
-               / np.abs(max_drawdown(r, log=log, full_stats=False))
+        / np.abs(max_drawdown(r, log=log, full_stats=False))
 
 
 @utils.appender(_defaultdocs)
@@ -867,7 +873,7 @@ def rolling_returns(r, window=None, log=False, anlz=True, **kwargs):
     """
 
     rr = (r.rolling(window=window, **kwargs)
-           .apply(cumulative_return, kwargs={'anlz' : anlz, 'log' : log}))
+          .apply(cumulative_return, kwargs={'anlz': anlz, 'log': log}))
     return rr
 
 
@@ -877,7 +883,7 @@ def min_max_return(r, window=None, anlz=True, log=False, **kwargs):
     if window is not None:
         r = rolling_returns(r, window=window, log=log, anlz=anlz,
                             **kwargs)
-    return DataFrame({'min' : r.min(), 'max' : r.max()})
+    return DataFrame({'min': r.min(), 'max': r.max()})
 
 
 @utils.appender(_defaultdocs, passed_to='rolling_returns')
@@ -924,7 +930,7 @@ def excess_returns(r, benchmark, window=None, anlz=True, method='arithmetic',
     if method in ['arithmetic', 'arith']:
         er = r.values - benchmark.values
     elif method in ['geometric', 'geo']:
-        er = np.subtract(np.divide(np.add(1., r), np.add(1., benchmark) ), 1.)
+        er = np.subtract(np.divide(np.add(1., r), np.add(1., benchmark)), 1.)
     return DataFrame(er, index=r.index, columns=r.columns)
 
 
@@ -1020,7 +1026,7 @@ def excess_drawdown_index(r, benchmark, method='CAER'):
         # First 3 steps are shared
         r = return_index(r)
         benchmark = return_index(benchmark)
-        er = np.add( np.subtract(r, benchmark), 1. )
+        er = np.add(np.subtract(r, benchmark), 1.)
 
         # 'ECR' & 'ECRR' diverge in process from here
         if method in ['ECR', 'ecr']:
@@ -1033,7 +1039,7 @@ def excess_drawdown_index(r, benchmark, method='CAER'):
             cam = np.squeeze(er.expanding().apply(lambda x: x.argmax()).values)
             r0 = r.iloc[cam].values
             b0 = benchmark.iloc[cam].values
-            dd = np.subtract( np.divide(r, r0), np.divide(benchmark, b0) )
+            dd = np.subtract(np.divide(r, r0), np.divide(benchmark, b0))
 
     return dd
 
@@ -1043,7 +1049,7 @@ def tracking_error(r, benchmark, window=None, log=False, anlz=True, ddof=1,
                    **kwargs):
     """The active risk of the portfolio: stdev of active returns."""
     er = excess_returns(r, benchmark=benchmark, window=window, log=log,
-                       anlz=anlz, **kwargs)
+                        anlz=anlz, **kwargs)
     return stdev(er, anlz=anlz, ddof=ddof)
 
 
@@ -1065,6 +1071,7 @@ def batting_avg(r, benchmark, window=None, log=False, anlz=True, thresh=0.0,
 
 # Up/down statistics
 # -----------------------------------------------------------------------------
+
 
 def downmarket_filter(r, benchmark, thresh=0.0, incl_benchmark=True):
     """Filter returns, including only periods where `benchmark` < `thresh`.
@@ -1131,7 +1138,7 @@ def upmarket_filter(r, benchmark, thresh=0.0, incl_benchmark=True):
 
 @utils.appender(_defaultdocs)
 def upside_capture(r, benchmark, anlz=False, method='geometric', log=False,
-                     thresh=0.0):
+                   thresh=0.0):
     """Upside capture versus the benchmark.
 
     Parameters
@@ -1158,11 +1165,11 @@ def upside_capture(r, benchmark, anlz=False, method='geometric', log=False,
     r, b = upmarket_filter(r, benchmark=benchmark, thresh=thresh)
     if method in ['cum', 'cumulative']:
         dc = cumulative_return(r, anlz=anlz).values \
-           / cumulative_return(b, anlz=anlz).values
+            / cumulative_return(b, anlz=anlz).values
     elif method in ['geo', 'geometric']:
         geomean = True if not anlz else False
         dc = cumulative_return(r, anlz=anlz, log=log, geomean=geomean).values \
-           / cumulative_return(b, anlz=anlz, log=log, geomean=geomean).values
+            / cumulative_return(b, anlz=anlz, log=log, geomean=geomean).values
     else:
         methods = ['`cumulative`', '`geometric`']
         raise ValueError('`method` must be one of %s' % methods)
@@ -1198,11 +1205,11 @@ def downside_capture(r, benchmark, anlz=False, method='geometric', log=False,
     r, b = downmarket_filter(r, benchmark=benchmark, thresh=thresh)
     if method in ['cum', 'cumulative']:
         dc = cumulative_return(r, anlz=anlz).values \
-           / cumulative_return(b, anlz=anlz).values
+            / cumulative_return(b, anlz=anlz).values
     elif method in ['geo', 'geometric']:
         geomean = True if not anlz else False
         dc = cumulative_return(r, anlz=anlz, log=log, geomean=geomean).values \
-           / cumulative_return(b, anlz=anlz, log=log, geomean=geomean).values
+            / cumulative_return(b, anlz=anlz, log=log, geomean=geomean).values
     else:
         methods = ['`cumulative`', '`geometric`']
         raise ValueError('`method` must be one of %s' % methods)
@@ -1266,9 +1273,9 @@ def insert_start(r, base=1.0):
 
     r = r.copy()
     freq = r.index.freq.freqstr
-    map = {'Y' : 'YearEnd', 'Q' : 'QuarterEnd', 'M' : 'QuarterEnd',
-           'W' : 'Week', 'D' : 'BDay',}
-    start = r.index[0] - getattr(offsets, map[freq])(1)
+    mapp = {'Y': 'YearEnd', 'Q': 'QuarterEnd', 'M': 'QuarterEnd',
+            'W': 'Week', 'D': 'BDay'}
+    start = r.index[0] - getattr(offsets, mapp[freq])(1)
 
     # Or: r.reindex, fill_value=0
     r.loc[start] = np.full_like(r.values[0], base)
@@ -1285,11 +1292,11 @@ def beta(r, benchmark, window=None):
     if window is None:
         model = ols.OLS(y=r, x=benchmark)
         res = DataFrame(np.atleast_1d(model.beta()), index=r.columns,
-                          columns=benchmark.columns)
+                        columns=benchmark.columns)
     else:
         model = ols.RollingOLS(y=r, x=benchmark, window=window)
         res = DataFrame(model.beta(), index=model.idx[window-1:],
-                          columns=r.columns)
+                        columns=r.columns)
     return res
 
 
@@ -1306,7 +1313,7 @@ def alpha(r, benchmark, window=None, anlz=True):
     else:
         model = ols.RollingOLS(y=r, x=benchmark, window=window)
         res = DataFrame(model.alpha(), index=model.idx[window-1:],
-                          columns=r.columns)
+                        columns=r.columns)
     if anlz:
         freq = r.index.freq.freqstr
         res = np.subtract(np.add(res, 1.) ** utils.convertfreq(freq), 1.)
@@ -1322,7 +1329,7 @@ def tstat_alpha(r, benchmark, window=None):
     else:
         model = ols.RollingOLS(y=r, x=benchmark, window=window)
         res = DataFrame(model.tstat_alpha(), index=model.idx[window-1:],
-                          columns=r.columns)
+                        columns=r.columns)
     return res
 
 
@@ -1332,11 +1339,11 @@ def tstat_beta(r, benchmark, window=None):
     if window is None:
         model = ols.OLS(y=r, x=benchmark)
         res = DataFrame(np.atleast_1d(model.tstat_beta()), index=r.columns,
-                          columns=benchmark.columns)
+                        columns=benchmark.columns)
     else:
         model = ols.RollingOLS(y=r, x=benchmark, window=window)
         res = DataFrame(model.tstat_beta(), index=model.idx[window-1:],
-                          columns=r.columns)
+                        columns=r.columns)
     return res
 
 
@@ -1349,7 +1356,7 @@ def rsq(r, benchmark, window=None):
     else:
         model = ols.RollingOLS(y=r, x=benchmark, window=window)
         res = DataFrame(model.rsq(), index=model.idx[window-1:],
-                          columns=r.columns)
+                        columns=r.columns)
     return res
 
 
@@ -1362,7 +1369,7 @@ def rsq_adj(r, benchmark, window=None):
     else:
         model = ols.RollingOLS(y=r, x=benchmark, window=window)
         res = DataFrame(model.rsq_adj(), index=model.idx[window-1:],
-                          columns=r.columns)
+                        columns=r.columns)
     return res
 
 
@@ -1409,7 +1416,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         r = r.subtract(factors['RF'])
     elif isinstance(r, DataFrame):
         n = r.shape[1]
-        r = r.subtract(np.tile(factors['RF'], (n,1)).T)
+        r = r.subtract(np.tile(factors['RF'], (n, 1)).T)
         # r = r.subtract(factors['RF'].values.reshape(-1,1))
     else:
         raise ValueError('`r` must be one of (Series, DataFrame)')
@@ -1419,7 +1426,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         # vol of MKT.  Both means and the standard deviations are multiplied
         # by the scale factor (ratio of MKT.std() to other stdevs).
         tgtvol = factors['MKT'].std()
-        diff = factors.columns.difference(['MKT', 'RF']) # don't scale these
+        diff = factors.columns.difference(['MKT', 'RF'])  # don't scale these
         vols = factors[diff].std()
         factors.loc[:, diff] = factors[diff] * tgtvol / vols
 
@@ -1438,7 +1445,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
                         ['MKT', 'UMD', 'STR', 'LTR'])
                        ('Fung-Hsieh Trend-Following Model',
                         ['BDLB', 'FXLB', 'CMLB', 'STLB', 'SILB'])
-        ])
+                       ])
 
     # Get union of keys and sort them according to `factors.columns`' order;
     # used later as columns in result
@@ -1458,7 +1465,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
             for k, v in rhs.items():
                 res = res.copy()
                 model = ols.OLS(y=r[col], x=factors[v],
-                                          hasconst=False)
+                                hasconst=False)
                 res.loc[(k, 'coef'), factors[v].columns] = model.beta()
                 res.loc[(k, 'tstat'), factors[v].columns] = model.tstat_beta()
                 res.loc[(k, 'coef'), 'alpha'] = model.alpha()
@@ -1527,8 +1534,8 @@ class Portfolio(object):
         if any((self.com, self.span, self.halflife, self.alpha)):
             res = (self.r.ewm(com=self.com, span=self.span,
                               halflife=self.halflife, alpha=self.alpha)
-                              .mean()
-                              .iloc[-1])
+                   .mean()
+                   .iloc[-1])
         else:
             res = self.r.mean()
         if weights.ndim > 1:
@@ -1578,11 +1585,11 @@ class Portfolio(object):
 
     def gmvp(self):
         """Global minimum-variance portfolio."""
-        cons = ({'type' : 'eq',
-                 'fun' : lambda x: np.sum(x) - self.max_exposure})
+        cons = ({'type': 'eq',
+                 'fun': lambda x: np.sum(x) - self.max_exposure})
         bnds = tuple((0, 1) for _ in range(self.noa))
         res = sco.minimize(self.stdev, x0=self.ew, args=(False,),
-                            method='SLSQP', bounds=bnds, constraints=cons).x
+                           method='SLSQP', bounds=bnds, constraints=cons).x
 
         return res
 
@@ -1612,17 +1619,17 @@ class Portfolio(object):
         vols = []
         opts = []
         for ret in rets:
-            cons = ({'type' : 'eq',
-                     'fun' : lambda x: self.expected_return(weights=x) - ret},
-                    {'type' : 'eq',
-                     'fun' : lambda x: np.sum(x) - self.max_exposure})
+            cons = ({'type': 'eq',
+                     'fun': lambda x: self.expected_return(weights=x) - ret},
+                    {'type': 'eq',
+                     'fun': lambda x: np.sum(x) - self.max_exposure})
             bnds = tuple((0, 1) for _ in range(self.noa))
             optv = sco.minimize(self.stdev, x0=self.ew, args=(False,),
-                               method='SLSQP', bounds=bnds, constraints=cons)
+                                method='SLSQP', bounds=bnds, constraints=cons)
             opts.append(optv.x)
             vols.append(self.stdev(weights=optv.x))
 
-        return {'weights' : np.array(opts), 'stdev' : vols, 'rets' : rets}
+        return {'weights': np.array(opts), 'stdev': vols, 'rets': rets}
 
     def stdev(self, weights=None, anlz=True):
         weights = self.weights if weights is None else weights
@@ -1654,7 +1661,7 @@ class Portfolio(object):
         return 2.0 * c
 
     def value_at_risk(self, r, n=21, method='analytic', normdist=False,
-                      bestfit=True, dist=None, nboot=1e4, c=None, 
+                      bestfit=True, dist=None, nboot=1e4, c=None,
                       weights=None):
 
         com = self.com
@@ -1679,7 +1686,8 @@ class Portfolio(object):
                              ' should be either None or False')
 
         elif bestfit:
-            dist = getattr(scs, returns.BestFitDist(x=port).fit().best()['name'])
+            dist = getattr(scs,
+                           general.BestFitDist(x=port).fit().best()['name'])
         elif normdist:
             dist = scs.norm
         elif dist:
@@ -1707,7 +1715,7 @@ class Portfolio(object):
                 sample = np.prod(bootstrap + 1., axis=1) - 1.
             elif method == 'rolling':
                 sample = (port.rolling(window=n)
-                             .apply(lambda x: np.prod(1. + x) - 1.))
+                          .apply(lambda x: np.prod(1. + x) - 1.))
             else:
                 raise ValueError("`method` must be in ('analytic',"
                                  " 'bootstrap', 'rolling')")
@@ -1725,6 +1733,7 @@ class Portfolio(object):
 
 
 # -----------------------------------------------------------------------------
+
 
 def extend_pandas():
     """Extends PandasObject (Series, DataFrame) with some funcs defined here.

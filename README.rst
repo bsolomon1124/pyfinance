@@ -9,4 +9,6 @@ New to PyPI as of Nov 2, 2017.
 
 Recommended install:
 
-`$ conda install pyfinance`
+`
+$ conda install pyfinance
+`

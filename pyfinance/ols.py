@@ -575,13 +575,13 @@ class RollingOLS(object):
 
 
     @property
-    def _pvalues_alpha(self):
+    def _pvalue_alpha(self):
         """Two-tailed p values for t-stats of the intercept only."""
         return _handle_rolling_ab(self._pvalues_all, self.use_const)[0]
 
 
     @property
-    def _pvalues_beta(self):
+    def _pvalue_beta(self):
         """Two-tailed p values for t-stats of parameters, excl. intercept."""
         return _handle_rolling_ab(self._pvalues_all, self.use_const)[1]
 
@@ -740,15 +740,15 @@ class RollingOLS(object):
 
 
     @property
-    def pvalues_alpha(self):
+    def pvalue_alpha(self):
         """Two-tailed p values for t-stats of the intercept only."""
-        return self._pvalues_alpha
+        return self._pvalue_alpha
 
 
     @property
-    def pvalues_beta(self):
+    def pvalue_beta(self):
         """Two-tailed p values for t-stats of parameters, excl. intercept."""
-        return self._pvalues_beta
+        return self._pvalue_beta
 
 
     @property
@@ -945,15 +945,15 @@ class PandasRollingOLS(RollingOLS):
 
 
     @property
-    def pvalues_alpha(self):
+    def pvalue_alpha(self):
         """Two-tailed p values for t-stats of the intercept only."""
-        return self._wrap_series(stat='_pvalues_alpha')
+        return self._wrap_series(stat='_pvalue_alpha')
 
 
     @property
-    def pvalues_beta(self):
+    def pvalue_beta(self):
         """Two-tailed p values for t-stats of parameters, excl. intercept."""
-        return self._wrap_dataframe(stat='_pvalues_beta')
+        return self._wrap_dataframe(stat='_pvalue_beta')
 
 
     @property

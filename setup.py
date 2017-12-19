@@ -20,7 +20,6 @@ setup(
     author='Brad Solomon',
     author_email='brad.solomon.1124@gmail.com',
     url='https://github.com/bsolomon1124/pyfinance',
-    download_url='https://github.com/bsolomon/pyfinance/archive/0.1.tar.gz',
     license='MIT',
     install_requires=[
         'beautifulsoup4 >= 4.6.0',

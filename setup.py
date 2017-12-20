@@ -16,7 +16,7 @@ setup(
     name='pyfinance',
     description='Python package designed for security returns analysis.',
     long_description=long_description,
-    version='0.2.0',
+    version='0.2.1',
     author='Brad Solomon',
     author_email='brad.solomon.1124@gmail.com',
     url='https://github.com/bsolomon1124/pyfinance',

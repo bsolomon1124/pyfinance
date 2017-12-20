@@ -21,6 +21,3 @@ from .ols import *
 from .options import *
 from .utils import *
 from .returns import *
-
-from . import returns
-returns.extend_pandas()

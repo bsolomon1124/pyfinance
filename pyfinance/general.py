@@ -1,7 +1,7 @@
 """Generalized tools for financial analysis & quantitative finance.
 
 Descriptions
-============
+------------
 activeshare
     Compute the active ahare of a fund versus an index.
 amortize
@@ -42,72 +42,66 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series
-from pandas.tseries import offsets
 import scipy.optimize as sco
 import scipy.stats as scs
 import seaborn as sns
 from sklearn.preprocessing import scale
 from sklearn.utils.extmath import svd_flip
+from statsmodels.regression import linear_model
+from statsmodels.tools import add_constant
 
-from pyfinance import datasets, ols, returns, utils, NUMTODEC
+from pyfinance import datasets, ols, returns, utils
+
+NUMTODEC = {'num': 1., 'dec': 0.01}
+
 
 def activeshare(fund, idx, in_format='num'):
     """Compute the active ahare of a fund versus an index.
 
     Formula is 0.5 * sum(abs(w_fund - w_idx)).
 
-    See Cremers & Petajisto, 'How Active Is Your Fund Manager?', 2009
-
     Parameters
-    ==========
-    fund: Series or DataFrame
-        the fund's holdings (index) with weights
-    idx: Series or DataFrame
-        the index, same format as fund
+    ----------
+    fund: {pd.Series, pd.DataFrame}
+        The fund's holdings, with tickers as the Index and weights as
+        values.  If a DataFrame, each column is a ticker/portfolio.
+    idx: pd.Series
+        The benchmark portfolio, with tickers as the Index and weights
+        as values.
+    in_format: {'num', 'dec'}
+        Decimal notation of the inputs.  "num" means 0.5% is denoted 0.5;
+        "dec" means 0.5% is denoted 0.005.
 
-    Example
-    =======
-    # SPDR® S&P 500® ETF
-    spy = 'https://us.spdrs.com/site-content/xls/SPY_All_Holdings.xls' \
-        + '?fund=SPY&docname=All+Holdings&onyx_code1=&onyx_code2='
-    spy = (read_excel(spy, skiprows=3)
-              .dropna(subset=['Weight'])
-              .set_index('Identifier')['Weight'])
+    Returns
+    -------
+    act_sh : pd.Series or pd.DataFrame
+        The dimension will be one-lower than that of `fund`.
+        If `fund` is a Series, the result is a scalar value.
+        If `fund` is a DataFrame, the result is a Series, with
+        the columns of `fund` as the resulting Index.
 
-    # SPDR® S&P® 500 High Dividend ETF
-    spyd = 'https://us.spdrs.com/site-content/xls/SPYD_All_Holdings.xls' \
-         + '?fund=SPYD&docname=All+Holdings&onyx_code1=&onyx_code2='
-    spyd = (read_excel(spyd, skiprows=3)
-              .dropna(subset=['Weight'])
-              .set_index('Identifier')['Weight'])
-
-    print(activeshare(spyd, spy))
-    0.81929927
-
-    print(activeshare(spyd.to_frame(), spy.to_frame()))
-    0.81929927
+    .. _Cremers & Petajisto, 'How Active Is Your Fund Manager?', 2009
     """
 
-    # TODO: more comprhensive ticker check (str.isalphanum?)
-    # TODO: vectorize for >1 fund
-
     if not (fund.index.is_unique) and (idx.index.is_unique):
-        raise ValueError('inputs do not have unique indices')
-
+        raise ValueError('Inputs must have unique indices.')
+    if isinstance(fund, pd.DataFrame):
+        cols = fund.columns
     fund = fund * NUMTODEC[in_format]
     idx = idx * NUMTODEC[in_format]
 
-    un = fund.index.union(idx.index)
-    fund = fund.reindex(un, fill_value=0.)
-    idx = idx.reindex(un, fill_value=0.)
-    act_sh = (0.5 * abs(fund - idx)).sum()
+    union = fund.index.union(idx.index)
+    fund = fund.reindex(union, fill_value=0.).values
+    idx = idx.reindex(union, fill_value=0.).values
 
-    if isinstance(act_sh, Series):
-        # If `fund` and `idx` are DataFrames -> Series
-        # Otherwise if `fund` and `idx` are Series -> scalar
-        act_sh = act_sh[0]
-
+    if fund.ndim == 1:
+        # Resulting active share will be a scalar
+        diff = fund - idx
+    else:
+        diff = fund - idx[:, None]
+    act_sh = np.sum(np.abs(diff) * 0.5, axis=0)
+    if isinstance(act_sh, np.ndarray):
+        act_sh = pd.Series(act_sh, index=cols)
     return act_sh
 
 
@@ -117,7 +111,7 @@ def amortize(rate, nper, pv, freq='M'):
     Rate -> annualized input
 
     Example
-    =======
+    -------
     # a 6.75% $200,000 loan, 30-year tenor, payments due monthly
     # view the 5 final months
     print(amortize(rate=.0675, nper=30, pv=200000).round(2).tail())
@@ -143,12 +137,11 @@ def amortize(rate, nper, pv, freq='M'):
         dfac = (1 + rate) ** nper
         return pv * dfac - pmt * (dfac - 1) / rate
 
-    res = DataFrame({'beg_bal' : balance(pv, rate, periods - 1, -pmt),
-                     'prin' : principal,
-                     'interest' : interest,
-                     'end_bal' : balance(pv, rate, periods, -pmt)},
-                    index=periods)['beg_bal', 'prin', 'interest', 'end_bal']
-
+    res = pd.DataFrame({'beg_bal': balance(pv, rate, periods - 1, -pmt),
+                        'prin': principal,
+                        'interest': interest,
+                        'end_bal': balance(pv, rate, periods, -pmt)},
+                       index=periods)['beg_bal', 'prin', 'interest', 'end_bal']
     return res
 
 
@@ -158,7 +151,7 @@ class BestFitDist(object):
     Core process within `.fit` is adopted from @tmthydvnprt (Stack Overflow).
 
     Parameters
-    ==========
+    ----------
     x : 1-d array-like or Series
         Empirical input data to model/fit
     bins : int or sequence of scalars or str, optional, default 'auto'
@@ -170,7 +163,7 @@ class BestFitDist(object):
         docs.scipy.org/doc/scipy/reference/stats.html#continuous-distributions
 
     Example
-    =======
+    -------
     from pyfinance import BestFitDist
     # 1000 random samples from a N~(5,3) distribution
     r = np.random.normal(loc=5, scale=3, size=1000)
@@ -253,7 +246,6 @@ class BestFitDist(object):
                         best_pdf = pdf
 
                 except (NotImplementedError, AttributeError):
-                    # TODO: what else might you (validly) run into here?
                     sses.append(np.nan)
                     params.append(np.nan)
 
@@ -271,15 +263,15 @@ class BestFitDist(object):
 
     def best(self):
         """The resulting best-fit distribution, its parameters, and SSE."""
-        return Series({'name' : self.best_dist.name,
-                       'params' : self.best_param,
-                       'sse' : self.best_sse})
+        return pd.Series({'name': self.best_dist.name,
+                          'params': self.best_param,
+                          'sse': self.best_sse})
 
     def all(self, by='name', ascending=True):
         """All tested distributions, their parameters, and SSEs."""
-        res = DataFrame({'name' : self.distributions,
-                         'params' : self.params,
-                         'sse' : self.sses})[['name', 'sse', 'params']]
+        res = pd.DataFrame({'name': self.distributions,
+                            'params': self.params,
+                            'sse': self.sses})[['name', 'sse', 'params']]
         res.sort_values(by=by, ascending=ascending, inplace=True)
 
         return res
@@ -295,7 +287,7 @@ def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
     """Wrapper around seaborn.heatmap for visualizing correlation matrix.
 
     Parameters
-    ==========
+    ----------
     x : DataFrame
         Underlying data (not a correlation matrix)
     mask_half : bool, default True
@@ -304,17 +296,16 @@ def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
     https://seaborn.pydata.org/generated/seaborn.heatmap.html
 
     Example
-    =======
-    %matplotlib inline
-
+    -------
     # Generate some correlated data
-    k = 10
-    size = 400
-    mu = np.random.randint(0, 10, k).astype(float)
-    r = np.random.ranf(k ** 2).reshape((k, k)) * 5
-    df = pd.DataFrame(np.random.multivariate_normal(mu, r, size=size))
-
-    corr_heatmap(df)
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> k = 10
+    >>> size = 400
+    >>> mu = np.random.randint(0, 10, k).astype(float)
+    >>> r = np.random.ranf(k ** 2).reshape((k, k)) * 5
+    >>> df = pd.DataFrame(np.random.multivariate_normal(mu, r, size=size))
+    >>> corr_heatmap(df, figsize=(6, 6))
     """
 
     if mask_half:
@@ -322,26 +313,25 @@ def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
         mask[np.triu_indices_from(mask)] = True
     else:
         mask = None
-
     with sns.axes_style('white'):
         return sns.heatmap(x.corr(), cmap=cmap, vmin=vmin, vmax=vmax,
-                    linewidths=linewidths, square=square, mask=mask, **kwargs)
+                           linewidths=linewidths, square=square,
+                           mask=mask, **kwargs)
 
 
 def ewm_params(param, param_value):
-    """Return corresponding param. values for exponential weighted functions.
+    """Corresponding parameter values for exponentially weighted functions.
 
     Parameters
-    ==========
-    param : str
-       must be one of {'alpha', 'com', 'span', 'halflife'}
+    ----------
+    param : {'alpha', 'com', 'span', 'halflife'}
     param_value : float or int
-        the parameter value
+        The parameter value.
 
     Returns
-    =======
+    -------
     result : dict
-        Layout/index of corresponding parameters
+        Layout/index of corresponding parameters.
     """
 
     if param not in ['alpha', 'com', 'span', 'halflife']:
@@ -351,28 +341,23 @@ def ewm_params(param, param_value):
         com = 1./a - 1.
         span = 2./a - 1.
         halflife = np.log(0.5)/np.log(1. - a)
-
-        return {'com' : com, 'span' : span, 'halflife' : halflife}
+        return {'com': com, 'span': span, 'halflife': halflife}
 
     def output_alpha(param, p):
         eqs = {
-            'com' : 1./(1. + p),
-            'span' : 2./(p + 1.),
-            'halflife' : 1. - np.exp(np.log(0.5)/p)
+            'com': 1./(1. + p),
+            'span': 2./(p + 1.),
+            'halflife': 1. - np.exp(np.log(0.5)/p)
         }
-
         return eqs[param]
 
     if param == 'alpha':
         dct = input_alpha(a=param_value)
         alpha = param_value
-
     else:
         alpha = output_alpha(param=param, p=param_value)
         dct = input_alpha(a=alpha)
-
-    dct.update({'alpha' : alpha})
-
+    dct.update({'alpha': alpha})
     return dct
 
 
@@ -395,7 +380,6 @@ def ewm_weights(i, com=None, span=None, halflife=None, alpha=None):
 
     res = (1. - alpha) ** np.arange(i)[::-1]
     res /= res.sum()
-
     return res
 
 
@@ -404,7 +388,7 @@ def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
     """Bootstrap a new distribution through exponential weighting.
 
     Parameters
-    ==========
+    ----------
     a : 1-D array-like
         Array from which to generate random sample of elements
     size : int or tuple of ints, default None
@@ -420,7 +404,7 @@ def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
         Smoothing factor
 
     Example
-    =======
+    -------
     import pandas as pd
     np.random.seed(123)
 
@@ -441,12 +425,10 @@ def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
     """
 
     if not any((com, span, halflife, alpha)):
-        raise ValueError('specify one of `com`, `span`, `halflife`, `alpha`')
-
+        raise ValueError('Specify one of `com`, `span`, `halflife`, `alpha`.')
     p = ewm_weights(i=len(a), com=com, span=span, halflife=halflife,
                     alpha=alpha)
     res = np.random.choice(a=a, size=size, p=p)
-
     return res
 
 
@@ -457,7 +439,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
     Incorporates a handful of well-known factors models.
 
     Parameters
-    ==========
+    ----------
     r : Series or DataFrame
         The left-hand-side variable(s).  If `r` is nx1 shape (a Series or
         single-column DataFrame), the result will be a DataFrame.  If `r` is
@@ -475,7 +457,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         Passed to `pyfinance.datasets.load_factors` if factors is not None
 
     Example
-    =======
+    -------
     # TODO
     """
 
@@ -494,12 +476,12 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
 
     r, factors = utils.constrain(r, factors)
 
-    if isinstance(r, Series):
+    if isinstance(r, pd.Series):
         n = 1
         r = r.subtract(factors['RF'])
-    elif isinstance(r, DataFrame):
+    elif isinstance(r, pd.DataFrame):
         n = r.shape[1]
-        r = r.subtract(np.tile(factors['RF'], (n,1)).T)
+        r = r.subtract(np.tile(factors['RF'], (n, 1)).T)
         # r = r.subtract(factors['RF'].values.reshape(-1,1))
     else:
         raise ValueError('`r` must be one of (Series, DataFrame)')
@@ -509,7 +491,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         # vol of MKT.  Both means and the standard deviations are multiplied
         # by the scale factor (ratio of MKT.std() to other stdevs)
         tgtvol = factors['MKT'].std()
-        diff = factors.columns.difference(['MKT', 'RF']) # don't scale these
+        diff = factors.columns.difference(['MKT', 'RF'])  # don't scale these
         vols = factors[diff].std()
         factors.loc[:, diff] = factors[diff] * tgtvol / vols
 
@@ -528,7 +510,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
                         ['MKT', 'UMD', 'STR', 'LTR'])
                        ('Fung-Hsieh Trend-Following Model',
                         ['BDLB', 'FXLB', 'CMLB', 'STLB', 'SILB'])
-        ])
+                       ])
 
     # Get union of keys and sort them according to `factors.columns`' order;
     # used later as columns in result
@@ -538,7 +520,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
     # Empty DataFrame to be populated with each regression's attributes
     stats = ['coef', 'tstat']
     idx = pd.MultiIndex.from_product([rhs.keys(), stats])
-    res = DataFrame(columns=cols, index=idx)
+    res = pd.DataFrame(columns=cols, index=idx)
 
     # Regression calls
     if n > 1:
@@ -548,7 +530,7 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
             for k, v in rhs.items():
                 res = res.copy()
                 model = ols.OLS(y=r[col], x=factors[v],
-                                          hasconst=False)
+                                hasconst=False)
                 res.loc[(k, 'coef'), factors[v].columns] = model.beta()
                 res.loc[(k, 'tstat'), factors[v].columns] = model.tstat_beta()
                 res.loc[(k, 'coef'), 'alpha'] = model.alpha()
@@ -583,7 +565,7 @@ class PCA(object):
         (See sklearn/decomposition/pca.py, L390)
 
     Parameters
-    ==========
+    ----------
     m : array-like (DataFrame, np.matrix, np.array)
         Time series of returns.  Cannot be sparse.
     threshold : float, or str in {'Jolliffe', 'Kaiser'}
@@ -592,7 +574,7 @@ class PCA(object):
         Kaiser's criterion is 1.0.
 
     Resources
-    =========
+    ---------
     Abdi & Williams, Principal Component Analysis, 2010
     Bro, Acar & Kolda, Resolving the Sign Ambiguity in the Singular Value
         Decomposition, 2007
@@ -604,7 +586,7 @@ class PCA(object):
     def __init__(self, m, threshold='Jolliffe', u_based_decision=False):
         # Keep a raw version of m for view and create a scaled version, ms
         # scaled to N~(0,1)
-        if isinstance(m, DataFrame):
+        if isinstance(m, pd.DataFrame):
             self.feature_names = m.columns
             self.m = m.values
         else:
@@ -614,7 +596,7 @@ class PCA(object):
             raise ValueError('Input contains NaN')
         self.ms = scale(self.m)
 
-        thresholds = {'Kaiser' : 1.0, 'Jolliffe' : 0.7}
+        thresholds = {'Kaiser': 1.0, 'Jolliffe': 0.7}
         if threshold is not None:
             if isinstance(threshold, str):
                 self.threshold = thresholds[threshold]
@@ -642,7 +624,7 @@ class PCA(object):
         Intertia is the percentage of explained variance.
 
         Returns
-        =======
+        -------
         self, to enable method chaining
         """
 
@@ -656,7 +638,7 @@ class PCA(object):
         # This implementation uses u_based_decision=False rather than the
         # default True to flip that logic and ensure the resulting
         # components and loadings have high positive coefficients
-        self.u, self.v = svd_flip(self.u, self.v, 
+        self.u, self.v = svd_flip(self.u, self.v,
                                   u_based_decision=self.u_based_decision)
 
         # Drop eigenvalues with value > threshold
@@ -674,12 +656,12 @@ class PCA(object):
     def eigen_table(self):
         """Eigenvalues, expl. variance, and cumulative expl. variance."""
         idx = ['Eigenvalue', 'Variability (%)', 'Cumulative (%)']
-        table = DataFrame(np.array([self.eigenvalues,
-                                    self.inertia,
-                                    self.cumulative_inertia]),
-                          columns=['F%s' % i for i in
-                                   range(1, self.keep + 1)],
-                          index=idx)
+        table = pd.DataFrame(np.array([self.eigenvalues,
+                                       self.inertia,
+                                       self.cumulative_inertia]),
+                             columns=['F%s' % i for i in
+                                      range(1, self.keep + 1)],
+                             index=idx)
 
         return table
 
@@ -687,8 +669,8 @@ class PCA(object):
         """Loadings = eigenvectors times sqrt(eigenvalues)."""
         loadings = self.v[:, :self.keep] * np.sqrt(self.eigenvalues)
         cols = ['PC%s' % i for i in range(1,  self.keep + 1)]
-        loadings = DataFrame(loadings, columns=cols, index=self.feature_names)
-
+        loadings = pd.DataFrame(loadings, columns=cols,
+                                index=self.feature_names)
         return loadings
 
     @property
@@ -716,18 +698,18 @@ class PCA(object):
         for i in range(q):
             d_old = d
             lam = np.dot(loadings, r)
-            u, s, vh = np.linalg.svd(np.dot(loadings.T, np.asarray(lam) ** 3
-                     - (gamma / p)
-                     * np.dot(lam,
-                              np.diag(np.diag(np.dot(lam.T, lam))))))
+            u, s, vh = np.linalg.svd(np.dot(
+                loadings.T, np.asarray(lam) ** 3 - (gamma / p)
+                * np.dot(lam, np.diag(np.diag(np.dot(lam.T, lam))))))
             r = np.dot(u, vh)
             d = np.sum(s)
-            if d / d_old < tol: break
+            if d / d_old < tol:
+                break
 
         cols = ['PC%s' % i for i in range(1, self.keep + 1)]
 
-        return DataFrame(np.dot(loadings, r), columns=cols,
-                         index=self.feature_names)
+        return pd.DataFrame(np.dot(loadings, r), columns=cols,
+                            index=self.feature_names)
 
 
 class PortSim(object):
@@ -736,7 +718,7 @@ class PortSim(object):
     NOTE: work-in-progress as of 2017.08.25.
 
     Parameters
-    ==========
+    ----------
     r : Series or DataFrame
         Time series of gross-of-fees security/account/fund returns.  Series are
         converted to single-column DataFrame with `prep`
@@ -812,17 +794,18 @@ class PortSim(object):
         self.index = self.gross.index
         self.columns = self.gross.columns
 
-        masktypes = {12. : 'is_month_end',
-                     4. : 'is_quarter_end',
-                     1. : 'is_quarter_end'}
+        masktypes = {12.: 'is_month_end',
+                     4.: 'is_quarter_end',
+                     1.: 'is_quarter_end'}
 
         mask = getattr(self.index, masktypes[self.fee_freq])
         self.feesched = np.where(mask, self.fee, 0.)
 
         # Net of fees (not yet of distributions)
         self.net = (1. + self.gross.values) \
-                 * (1. - self.feesched.reshape(-1,1)) - 1.
-        self.net = DataFrame(self.net, index=self.index, columns=self.columns)
+            * (1. - self.feesched.reshape(-1,1)) - 1.
+        self.net = pd.DataFrame(self.net, index=self.index,
+                                columns=self.columns)
 
         self.dist_amt = dist_amt
         self.dist_pct = dist_pct
@@ -841,8 +824,8 @@ class PortSim(object):
 
         elif self.dist_pct is not None:
             res = returns.return_index((1.+self.net) * (1.-self.dist_pct) - 1.,
-                              base=self.v0, include_start=self.include_start)
-
+                                       base=self.v0,
+                                       include_start=self.include_start)
         return res
 
 
@@ -854,11 +837,11 @@ class TEOpt(object):
     minimized the tracking error of `r` to `proxies` over that period.
 
     Example
-    =======
+    -------
     # TODO
 
     Parameters
-    ==========
+    ----------
     r : DataFrame
         The target time series of returns to be replicated
     proxies : DataFrame
@@ -893,19 +876,19 @@ class TEOpt(object):
             if isinstance(weights, list):
                 weights = np.array(weights)
             proxy = np.sum(proxies * weights, axis=1)
-            te = np.std(proxy - r) # not anlzd...
+            te = np.std(proxy - r)  # not anlzd...
             return te
 
         ew = utils.equal_weights(n=self.n, sumto=self.sumto)
         bnds = tuple((0, 1) for x in range(self.n))
-        cons = ({'type' : 'eq', 'fun' : lambda x: np.sum(x) - self.sumto})
+        cons = ({'type': 'eq', 'fun': lambda x: np.sum(x) - self.sumto})
 
         xs = []
         funs = []
         for i, j in zip(self._r, self._proxies):
             opt = sco.minimize(te, x0=ew, args=(i,j), method='SLSQP',
                                bounds=bnds, constraints=cons)
-            x, fun  = opt['x'], opt['fun']
+            x, fun = opt['x'], opt['fun']
             xs.append(x)
             funs.append(fun)
         self._xs = np.array(xs)
@@ -915,17 +898,17 @@ class TEOpt(object):
 
     def opt_weights(self):
         """Optimal weights (period-end)."""
-        return DataFrame(self._xs, index=self.newidx, columns=self.cols)
+        return pd.DataFrame(self._xs, index=self.newidx, columns=self.cols)
 
     def ex_ante_te(self):
         """Tracking error corresponding to each optimized lookback period."""
         # TODO: check manually
-        return Series(self._funs, index=self.newidx)
+        return pd.Series(self._funs, index=self.newidx)
 
     def replicate(self):
         """Forward-month returns of the replicating portfolio."""
-        return (np.sum(self.proxies[self.window:] * self._xs[:-1], axis=1)
-                   .reindex(self.r.index))
+        return np.sum(self.proxies[self.window:] * self._xs[:-1],
+                      axis=1).reindex(self.r.index)
 
 
 def variance_inflation_factor(regressors, hasconst=False):
@@ -940,7 +923,7 @@ def variance_inflation_factor(regressors, hasconst=False):
     because of this. [source: StatsModels]
 
     Parameters
-    ==========
+    ----------
     regressors: DataFrame
         DataFrame containing the entire set of regressors
     hasconst : bool, default False
@@ -948,7 +931,7 @@ def variance_inflation_factor(regressors, hasconst=False):
         OLS
 
     Example
-    =======
+    -------
     # Generate some data
     from datetime import date
     from pandas_datareader.data import DataReader as dr
@@ -971,18 +954,18 @@ def variance_inflation_factor(regressors, hasconst=False):
     """
 
     if not hasconst:
-        regressors = sm.add_constant(regressors, prepend=False)
+        regressors = add_constant(regressors, prepend=False)
     k = regressors.shape[1]
 
     def vif_sub(x, regressors):
         x_i = regressors.iloc[:, x]
         mask = np.arange(k) != x
         x_not_i = regressors.iloc[:, mask]
-        rsq = sm.OLS(x_i, x_not_i, missing='drop').fit().rsquared_adj
+        rsq = linear_model.OLS(x_i, x_not_i, missing='drop').fit().rsquared_adj
         vif = 1. / (1. - rsq)
         return vif
 
-    vifs = Series(np.arange(k), index=regressors.columns)
+    vifs = pd.Series(np.arange(k), index=regressors.columns)
     vifs = vifs.apply(vif_sub, args=(regressors,))
 
     # Find the constant column (probably called 'const', but not necessarily
@@ -990,5 +973,4 @@ def variance_inflation_factor(regressors, hasconst=False):
     is_nonzero_const = np.ptp(regressors.values, axis=0) == 0
     is_nonzero_const &= np.all(regressors != 0.0, axis=0)
     vifs.drop(vifs.index[is_nonzero_const], inplace=True)
-
     return vifs

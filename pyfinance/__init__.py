@@ -1,23 +1,28 @@
 """Python package designed for general financial and security returns analysis.
 
-
 Modules
-=======
-- datasets : Financial dataset web scrubbing
-- general : Generalized tools for financial analysis & quantitative finance
-- ols : Ordinary least squares regression
-- options : European option valuation and strategy visualization
-- returns : Statistical analysis of time series security returns data
-- utils : Basic utilities and helper functions
+-------
+`datasets.py`  Financial dataset download & assembly via `requests`.
+
+`general.py`   General-purpose financial computations, such as active
+               share calculation, returns distribution approximation,
+               and tracking error optimization.
+
+`ols.py`       Ordinary least-squares (OLS) regression, supporting
+               static and rolling cases, built with a matrix formulation
+               and implemented with NumPy.
+
+`options.py`   Vectorized option calculations, including Black-Scholes
+               Merton European option valuation, Greeks, and implied
+               volatility, as well as payoff determination for common
+               money-spread option strategies.
+
+`returns.py`   Statistical analysis of financial time series through
+               the CAPM framework, designed to mimic functionality of
+               software such as FactSet Research Systems and Zephyr,
+               with improved speed and flexibility.
+
+`utils.py`     Utilities not fitting into any of the above.
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
-
-NUMTODEC = {'num' : 1., 'dec' : 0.01}
-
-from .datasets import *
-from .general import *
-from .ols import *
-from .options import *
-from .utils import *
-from .returns import *

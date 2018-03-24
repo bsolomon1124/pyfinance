@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # flake8: noqa
 
 # This is a kludgy way about things--it uses hardcoded values pulled

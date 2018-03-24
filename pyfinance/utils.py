@@ -3,7 +3,7 @@
 Some do not pertain directly to finance.
 
 Descriptions
-============
+------------
 
 appender
     Decorator for appending commonly used parameter definitions.
@@ -44,30 +44,32 @@ view
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
-
 __all__ = [
     'appender', 'avail', 'can_broadcast', 'convertfreq', 'constrain',
     'constrain_horizon', 'dropcols', 'encode', 'equal_weights',
-    'expanding_stdize', 'flatten', 'isiterable', 'public_dir',
-    'random_tickers', 'random_weights', 'rolling_windows', 'view'
+    'expanding_stdize', 'isiterable', 'public_dir',
+    'random_tickers', 'random_weights', 'rolling_windows', 'view',
+    'unique_everseen', 'uniqify'
     ]
 
 from functools import wraps
 import inspect
 import itertools
+import pickle
 import random
 import re
 import string
 import textwrap
-try:
-   import cPickle as pickle
-except ImportError:
-   import pickle
+import sys
 
 import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
 from pandas.tseries import offsets
+
+
+PY37 = sys.version_info.major == 3 and sys.version_info.minor >= 7
+
 
 def appender(defaultdocs, passed_to=None):
     """Decorator for appending commonly used parameter definitions.
@@ -79,7 +81,7 @@ def appender(defaultdocs, passed_to=None):
     parameters and values being descriptions.
 
     Example
-    =======
+    -------
     ddocs = {
 
         'a' :
@@ -134,61 +136,59 @@ def can_broadcast(*args):
 
 
 def convertfreq(freq):
-    """Convert string frequencies to periods per year.
+    """Convert string frequency to periods per year.
 
     Used in upsampling & downsampling.
 
-    `freq` is case-insensitive and may be:
-    - One of ('D', 'W', 'M', 'Q', 'A')
-    - One of pandas anchored offsets, such as 'W-FRI':
-      pandas.pydata.org/pandas-docs/stable/timeseries.html#anchored-offsets
+    Parameters
+    ----------
+    freq : str
+        May be one of ('D', 'W', 'M', 'Q', 'A') or any of Pandas
+        *anchored offset alises*, such as 'W-FRI'.  Case-insensitive.
 
     Example
-    =======
-    print(convertfreq('M'))
+    -------
+    >>> from pyfinance import utils
+
+    >>> utils.convertfreq('M')
     12.0
-
-    print(convertfreq('Q'))
+    >>> utils.convertfreq('BQS-DEC')
     4.0
 
-    print(convertfreq('BQS-DEC'))
-    4.0
+    .. _Pandas Offset Aliases:
+        pandas.pydata.org/pandas-docs/stable/timeseries.html#anchored-offsets
     """
 
     freq = freq.upper()
 
-    days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-    months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP',
-              'OCT', 'NOV', 'DEC']
+    days = ('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')
+    months = ('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP',
+              'OCT', 'NOV', 'DEC')
 
-    weekoffsets = ['W-%s' % d for d in days]
-    qtroffsets = ['Q-%s' % m for m in months] \
-               + ['QS-%s' % m for m in months] \
-               + ['BQ-%s' % m for m in months] \
-               + ['BQS-%s' % m for m in months]
-    annoffsets = ['A-%s' % m for m in months] \
-               + ['AS-%s' % m for m in months] \
-               + ['BA-%s' % m for m in months] \
-               + ['BAS-%s' % m for m in months]
+    weekoffsets = ('W-%s' % d for d in days)
+    qtroffsets = (['%s-%s' % (i, m) for m in months] for i in
+                  ('Q', 'QS', 'BQ', 'BQS'))
+    annoffsets = (['%s-%s' % (i, m) for m in months] for i in
+                  ('A', 'AS', 'BA', 'BAS'))
 
-    freqs = {'D' : 252., 'W' : 52., 'M' : 12., 'Q' : 4., 'A' : 1.}
-    freqs.update(zip(weekoffsets, [52.] * len(weekoffsets)))
-    freqs.update(zip(qtroffsets, [4.] * len(qtroffsets)))
-    freqs.update(zip(annoffsets, [1.] * len(annoffsets)))
-
-    return freqs[freq]
+    from_iter = itertools.chain.from_iterable
+    freqs = {'D': 252., 'W': 52., 'M': 12., 'Q': 4., 'A': 1.}
+    freqs.update(zip(weekoffsets, [52.] * 48))
+    freqs.update(zip(from_iter(qtroffsets), [4.] * 48))
+    freqs.update(zip(from_iter(annoffsets), [1.] * 48))
+    return freqs.get(freq)
 
 
 def constrain(*objs):
     """Constrain group of DataFrames & Series to intersection of indices.
 
     Parameters
-    ==========
+    ----------
     objs : iterable
         DataFrames and/or Series to constrain
 
     Returns
-    =======
+    -------
     new_dfs : list of DataFrames, copied rather than inplace
     """
 
@@ -214,7 +214,7 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
     dateutil.readthedocs.io/en/stable/relativedelta.html
 
     Parameters
-    ==========
+    ----------
     r : DataFrame or Series
         The target pandas object to constrain
     strict : bool, default False
@@ -318,7 +318,7 @@ def dropcols(df, start=None, end=None):
     syntax for tseries-indexed DataFrames.
 
     Parameters
-    ==========
+    ----------
     df : DataFrame
     start : str or datetime, default None
         start cutoff date, inclusive
@@ -326,7 +326,7 @@ def dropcols(df, start=None, end=None):
         end cutoff date, inclusive
 
     Example
-    =======
+    -------
     df = DataFrame(np.random.randn(10,3),
                    index=pd.date_range('2017', periods=10))
 
@@ -361,6 +361,42 @@ def dropcols(df, start=None, end=None):
     return df.dropna(axis=1, subset=subset)
 
 
+def dropout(a, p=0.5, inplace=False):
+    """Randomly set elements from `a` equal to zero, with proportion `p`.
+
+    Similar in concept to the dropout technique employed within
+    neural networks.
+
+    Parameters
+    ----------
+    a: numpy.ndarray
+        Array to be modified.
+    p: float in [0, 1]
+        Expected proportion of elements in the result that will equal 0.
+    inplace: bool
+
+    Example
+    -------
+    >>> x = np.arange(10, 20, 2, dtype=np.uint8)
+    >>> z = dropout(x, p=0.6)
+    >>> z
+    array([10, 12,  0,  0,  0], dtype=uint8)
+    >>> x.dtype == z.dtype
+    True
+    """
+
+    dt = a.dtype
+    if p == 0.5:
+        # Can't pass float dtype to `randint` directly.
+        rand = np.random.randint(0, high=2, size=a.shape).astype(dtype=dt)
+    else:
+        rand = np.random.choice([0, 1], p=[p, 1-p], size=a.shape).astype(dt)
+    if inplace:
+        a *= rand
+    else:
+        return a * rand
+
+
 def _uniquewords(*args):
     """Dictionary of words to their indices.  Helper function to `encode.`"""
     words = {}
@@ -391,11 +427,11 @@ def equal_weights(n, sumto=1.):
     n -> int or float; the number of weights, summing to `sumto`
 
     Example
-    =======
-    print(equal_weights(5))
+    -------
+    >>> equal_weights(5)
     [ 0.2  0.2  0.2  0.2  0.2]
 
-    print(equal_weights(5, sumto=1.2))
+    >>> equal_weights(5, sumto=1.2)
     [ 0.24  0.24  0.24  0.24  0.24]
     """
 
@@ -408,7 +444,7 @@ def expanding_stdize(obj, **kwargs):
     **kwargs -> passed to `obj.expanding`
 
     Example
-    =======
+    -------
     df = pd.DataFrame(np.random.randn(10, 3))
     print(expanding_stdize(df, min_periods=5))
              0        1        2
@@ -426,39 +462,6 @@ def expanding_stdize(obj, **kwargs):
 
     return (obj - obj.expanding(**kwargs).mean()) \
          / (obj.expanding(**kwargs).std())
-
-
-def flatten(iterable):
-    """Flatten a nested iterable.  Returns a generator object.
-
-    More flexible than list comprehension of the format:
-    `[item for sublist in list for item in sublist]` because it can handle a
-    'hybrid' list of lists where some elements are not iterable.
-
-    Example
-    =======
-    l1 = [[1, 2], 1, [1]]
-    l2 = [[1, 2], ['a', ['b']], [1]]
-
-    print(list(flatten(l1)))
-    print(list(flatten(l2)))
-    [1, 2, 1, 1]
-    [1, 2, 'a', 'b', 1]
-
-    Source
-    ======
-    http://rightfootin.blogspot.com/2006/09/more-on-python-flatten.html
-    """
-
-    # Functional, but also throws TypeError if `iterable` is not iterable
-    it = iter(iterable)
-
-    for e in it:
-        if isinstance(e, (list, tuple)):
-            for f in flatten(e):
-                yield f
-        else:
-            yield e
 
 
 def isiterable(obj):
@@ -500,10 +503,10 @@ def public_dir(obj, underscores=1):
 
     Return an alphabetized list of names comprising the attributes
     of the given object, EXCEPT those starting with the specified number of
-    `underscores`.  
+    `underscores`.
 
     Example
-    =======
+    -------
 
     class Cls:
         def __init__(self):
@@ -528,52 +531,91 @@ def public_dir(obj, underscores=1):
     return [f for f in dir(obj) if not f.startswith(underscores)]
 
 
-def random_tickers(length, n, ends_in=None, letters=None):
-    """Generate a length-n list of random ticker symbols.
+def random_tickers(length, n_tickers, endswith=None, letters=None,
+                   slicer=itertools.islice):
+    """Generate a length-n_tickers list of unique random ticker symbols.
 
     Parameters
-    ==========
+    ----------
     length : int
-        the length of each ticker string
-    n : int
-        number of tickers to generate
-    endsin : str, default None
-        specify the final element(s) of each ticker (for example, 'X')
-    letters : list or set, default None
-        Container of possible letters to choose from.  If None, defaults to
-        `string.ascii_uppercase`
+        The length of each ticker string.
+    n_tickers : int
+        Number of tickers to generate.
+    endswith : str, default None
+        Specify the ending element(s) of each ticker (for example, 'X').
+    letters : sequence, default None
+        Sequence of possible letters to choose from.  If None, defaults to
+        `string.ascii_uppercase`.
+
+    Returns
+    -------
+    list of str
 
     Examples
-    ========
-    print(random_tickers(5, 4, 'X'))
+    --------
+    >>> from pyfinance import utils
+    >>> utils.random_tickers(length=5, n_tickers=4, endswith='X')
     ['UZTFX', 'ROYAX', 'ZBVIX', 'IUWYX']
 
-    print(random_tickers(5, 4))
-    ['OLHZP', 'MCAAJ', 'JMKFD', 'FFSCH']
+    >>> utils.random_tickers(3, 8)
+    ['SBW', 'GDF', 'FOG', 'PWO', 'QDH', 'MJJ', 'YZD', 'QST']
     """
+
+    # The trick here is that we need uniqueness.  That defeats the
+    #     purpose of using NumPy because we need to generate 1x1.
+    #     (Although the alternative is just to generate a "large
+    #     enough" duplicated sequence and prune from it.)
 
     if letters is None:
         letters = string.ascii_uppercase
-    if endsin:
-        length = length - len(endsin)
-    res = random.sample(list(
-              itertools.combinations_with_replacement(letters, length)), n)
-    res = [''.join(i) for i in res]
-    if endsin:
-        res = [r + endsin for r in res]
-
-    return res
+    if endswith:
+        # Only generate substrings up to `endswith`
+        length = length - len(endswith)
+    join = ''.join
+    def yield_ticker(rand=random.choices):
+        if endswith:
+            while True:
+                yield join(rand(letters, k=length)) + endswith
+        else:
+            while True:
+                yield join(rand(letters, k=length))
+    tickers = itertools.islice(unique_everseen(yield_ticker()), n_tickers)
+    return list(tickers)
 
 
 def random_weights(size, sumto=1.):
-    """Generate a np.array of `n` random weights that sum to `sumto`.
+    """Generate an array of random weights that sum to `sumto`.
 
-    Note that sumto is subject to typical Python floating point limitations.
+    The result may be of arbitrary dimensions.  `size` is passed to
+    the `size` parameter of `np.random.random`, which acts as a shape
+    parameter in this case.
+
+    Note that `sumto` is subject to typical Python floating point limitations.
+    This function does not implement a softmax check.
+
+    Parameters
+    ----------
+    size: int or tuple of ints, optional
+        Output shape.  If the given shape is, e.g., ``(m, n, k)``, then
+        ``m * n * k`` samples are drawn.
+    sumto: float, default 1.
+        Each vector of weights should sum to this in decimal terms.
+
+    Returns
+    -------
+    np.ndarray
     """
 
     w = np.random.random(size)
-    w = sumto * w.T / np.sum(w.T, axis=0)
-    return w.T
+    if w.ndim == 2:
+        if isinstance(sumto, (np.ndarray, list, tuple)):
+            sumto = np.asarray(sumto)[:, None]
+        w = sumto * w / w.sum(axis=-1)[:, None]
+    elif w.ndim == 1:
+        w = sumto * w / w.sum()
+    else:
+        raise ValueError('`w.ndim` must be 1 or 2, not %s' % w.ndim)
+    return w
 
 
 def rolling_windows(a, window):
@@ -582,7 +624,7 @@ def rolling_windows(a, window):
     Note that the orientation of rows/columns follows that of pandas.
 
     Example
-    =======
+    -------
     import numpy as np
     onedim = np.arange(20)
     twodim = onedim.reshape((5,4))
@@ -617,14 +659,14 @@ def rolling_windows(a, window):
 
     if window > a.shape[0]:
         raise ValueError('Specified `window` length of {0} exceeds length of'
-                         ' `a`, {1}.'.format(window, a.shape[0])) 
+                         ' `a`, {1}.'.format(window, a.shape[0]))
     if isinstance(a, (Series, DataFrame)):
         a = a.values
     if a.ndim == 1:
         a = a.reshape(-1, 1)
     shape = (a.shape[0] - window + 1, window) + a.shape[1:]
     strides = (a.strides[0],) + a.strides
-    windows = np.squeeze(np.lib.stride_tricks.as_strided(a, shape=shape, 
+    windows = np.squeeze(np.lib.stride_tricks.as_strided(a, shape=shape,
                                                          strides=strides))
     # In cases where window == len(a), we actually want to "unsqueeze" to 2d.
     #     I.e., we still want a "windowed" structure with 1 window.
@@ -633,6 +675,45 @@ def rolling_windows(a, window):
     return windows
 
 
+def unique_everseen(iterable, filterfalse_=itertools.filterfalse):
+    """Unique elements, preserving order."""
+    # Itertools recipes:
+    # https://docs.python.org/3/library/itertools.html#itertools-recipes
+    seen = set()
+    seen_add = seen.add
+    for element in filterfalse_(seen.__contains__, iterable):
+        seen_add(element)
+        yield element
+
+
+def uniqify(seq):
+    """`Uniqify` a sequence, preserving order.
+
+    A plain-vanilla version of itertools' `unique_everseen`.
+
+    Example
+    -------
+    >>> s = list('zyxabccabxyz')
+    >>> uniqify(s)
+    ['z', 'y', 'x', 'a', 'b', 'c'
+
+    Returns
+    -------
+    list
+    """
+
+    if PY37:
+        # Credit: Raymond Hettinger
+        return list(dict.fromkeys(seq))
+    else:
+        # Credit: Dave Kirby
+        # https://www.peterbe.com/plog/uniqifiers-benchmark
+        seen = set()
+        # We don't care about truth value of `not seen.add(x)`;
+        # just there to add to `seen` inplace.
+        return [x for x in seq if x not in seen and not seen.add(x)]
+
+
 def view(df, row=10, col=5):
-    """Abbreviated view similar to .head, but limit both rows & columns."""
+    """Abbreviated view like `.head()`, but limit both rows & columns."""
     return df.iloc[:row, :col]

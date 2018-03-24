@@ -1,22 +1,21 @@
-from codecs import open as op
+from codecs import open
 import os
 from setuptools import setup, find_packages
 
-
-# __file__ is the pathname of the file from which the module was loaded.
-# `here` will be something like '~/.../anaconda3/pyfinance'.
 here = os.path.abspath(os.path.dirname(__file__))
 
-# Get the long description from the README file
-with op(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
+# Get long description from the README file.
+with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
+# PyPI upload:
+#  pyfinance$ python setup.py test sdist upload -r pypi
 
 setup(
     name='pyfinance',
     description='Python package designed for security returns analysis.',
     long_description=long_description,
-    version='0.2.1',
+    version='0.3.0',
     author='Brad Solomon',
     author_email='brad.solomon.1124@gmail.com',
     url='https://github.com/bsolomon1124/pyfinance',
@@ -30,7 +29,6 @@ setup(
         'requests >= 2.11.1',
         'scipy >= 0.10.0',
         'seaborn >= 0.8.0',
-        'selenium >= 3.5.0',
         'scikit-learn >= 0.18',
         'statsmodels >= 0.6.0',
         'xlrd >= 0.5.4',

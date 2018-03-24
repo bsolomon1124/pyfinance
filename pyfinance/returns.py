@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """Statistical analysis of security returns time series.
 
 Intended to mimic functionality of commercial software such as FactSet,
@@ -19,7 +17,7 @@ such as mutation of the Pandas DataFrame that is passed to
 the class constructor.
 
 Limitations
-===========
+-----------
 - This implementation currently supports only a 1-benchmark case.
   Methods that have a `benchmark` parameter take an instance
   of `Returns` that is a single-column DataFrame.  (Under the
@@ -35,14 +33,12 @@ __all__ = ['Returns']
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 import copy
-from functools import lru_cache
+import functools
 from itertools import product
 
 import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
-
-# TODO: move these funcs to sep. module?
 
 
 def _add_freq(obj, freq):
@@ -344,7 +340,7 @@ class Returns(DataFrame):
                                op='ge')
         return uc.div(dc)
 
-    @lru_cache(maxsize=None)
+    @functools.lru_cache(maxsize=None)
     def _get_rf(self):
         from pyfinance import datasets  # noqa
         # TODO: careful with self.freq, could be None
@@ -422,11 +418,3 @@ class Returns(DataFrame):
 
     def rsq_adj(self, benchmark):
         raise NotImplementedError
-
-# np.random.seed(123)  # noqa
-# data = np.random.randn(36, 3) + 0.2 # noqa
-# df = DataFrame(data, index=pd.date_range('2014',
-#                                          periods=36, freq='M'),
-#                columns=list('abc'))
-# sf = Returns(df, fmt='num')
-# bm = sf.pop('c')

@@ -1,10 +1,6 @@
 pyfinance
 =========
 
-**Note**: pyfinance aims for compatability with all minor releases of Python 3.x, but does not guarantee workability with Python 2.x.
-
-----
-
 pyfinance is a Python package built for investment management and analysis of security returns.
 
 It is meant to be a complement to existing packages geared towards quantitative finance, such as `pyfolio
@@ -12,6 +8,8 @@ It is meant to be a complement to existing packages geared towards quantitative 
 <https://github.com/pmorissette/ffn>`_, `pandas-datareader
 <https://github.com/pydata/pandas-datareader>`_, and `fecon235
 <https://github.com/rsvp/fecon235>`_.
+
+**Note**: pyfinance aims for compatability with all minor releases of Python 3.x, but does not guarantee workability with Python 2.x.
 
 --------
 Contents
@@ -35,7 +33,7 @@ Installation
 ------------
 
 pyfinance is available via `PyPI
-<https://pypi.python.org/pypi/pyfinance/0.2.1>`_.  The latest version is 0.3.0 [TODO] as of March 2018.:  Install with pip::
+<https://pypi.python.org/pypi/pyfinance/>`_.  The latest version is 0.3.0 as of March 2018.:  Install with pip::
 
     $ pip3 install pyfinance
 
@@ -43,7 +41,7 @@ pyfinance is available via `PyPI
 Dependencies
 ------------
 
-pyfinance relies primarily on Python's scientific stack, including NumPy, Pandas, Matplotlib, Seaborn, Scikit-Learn, and StatsModels.  Other dependencies include Beautiful Soup, Requests, Selenium, xrld, and xmltodict.
+pyfinance relies primarily on Python's scientific stack, including NumPy, Pandas, Matplotlib, Seaborn, Scikit-Learn, and StatsModels.  Other dependencies include Beautiful Soup, Requests, xrld, and xmltodict.
 
 See :code:`setup.py` for specific version threshold requirements.
 
@@ -87,16 +85,16 @@ The :code:`utils.py` module contains odds-and-ends utilities.
     >>> utils.convertfreq('BQS-DEC')
     4.0
 
-:datasets"`datasets.py` provides for financial dataset download & assembly via :code:`requests`.  It leverages sources including:
+:code:`datasets.py` provides for financial dataset download & assembly via :code:`requests`.  It leverages sources including:
 
 - Ken French's data library (via :code:`pandas-datareader`);
 - SEC.gov;
 - cboe.com;
 - AQR's dataset page;
 - fred.stlouisfed.org;
-- Robert Shiller's page at www.econ.yale.edu.
+- Robert Shiller's page at econ.yale.edu.
 
-Below is a batch of examples,
+Below is a batch of examples.
 
 Load SEC 13F filings:
 
@@ -150,7 +148,7 @@ S&P 500 and interest rate data from Robert Shiller's website, 1871-present:
     1871-06-30   4.82   0.26    0.4  12.0835     5.3367
     1871-07-31   4.73   0.26    0.4  12.0835     5.3400
 
-The :code:`ols.py` module
+The :code:`ols.py` module provides ordinary least-squares (OLS) regression, supporting static and rolling cases, and is built with a matrix formulation and implemented with NumPy.
 
 First, let's load some data on currencies, interest rates, and commodities to generate a regression of changes in the trade-weighted USD against interest rate term spreads and copper.
 
@@ -222,7 +220,8 @@ The module also supports rolling regression.  (Iterative regressions done on sli
 - :code:`RollingOLS` has methods that generate NumPy arrays as outputs.
 - :code:`PandasRollingOLS` is a wrapper around :code:`RollingOLS` and is meant to mimic the look of Pandas's deprecated :code:`MovingOLS` class.  It generates Pandas DataFrame and Series outputs.
 
-**Note**: all solutions are generated through a matrix formulation, which takes advantage of NumPy's broadcasting feature to expand this classical matrix formulation to an additional dimension.  This approach may be slow for significantly large datasets.
+**Note**: all solutions are generated through a matrix formulation, which takes advantage of NumPy's broadcasting capabilities to expand the classical `matrix formulation
+<https://onlinecourses.science.psu.edu/stat501/node/382>`_ to an additional dimension.  This approach may be slow for significantly large datasets.
 
 Also, note that windows are not "time-aware" in the way that Pandas time functionaity is.  Because of the NumPy implementation, specifying a window of 12 where the index contains one missing months would generate a regression over 13 months.  To avoid this, simply reindex the input data to a set frequency.
 
@@ -324,10 +323,6 @@ Here is an example of constructing a bear spread, which is a combination of 2 pu
 
     >>> spread.profit()
     array([-51.38,  -1.38,  48.62])
-
-:code:`general.py`, as the name implies, is a container for general-purpose financial computations, such as active share calculation, returns distribution approximation, and tracking error optimization.
-
-
 
 ---
 API

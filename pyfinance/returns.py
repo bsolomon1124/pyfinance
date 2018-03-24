@@ -8,13 +8,18 @@ DataFrame.  It implements a collection of new methods that pertain
 specifically to the study of security returns, such as cumulative
 return indices, annualized volatility, and drawdown.
 
-Technical note: the Pandas developers recommend against
-subclassing a DataFrame in favor of "piping" method chaining
-or using composition.  However, these two alternatives
-are suboptimal in this case, and quasi-private
+Note
+----
+The Pandas developers recommend against subclassing a DataFrame in
+favor of "piping" method chaining or using composition.
+
+However, these two alternatives are suboptimal here, and quasi-private
 magic is built-in here to protect against some common pitfalls,
 such as mutation of the Pandas DataFrame that is passed to
 the class constructor.
+
+.. _Subclassing Pandas Data Structures:
+    https://pandas.pydata.org/pandas-docs/stable/internals.html
 
 Limitations
 -----------
@@ -34,65 +39,80 @@ __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 import copy
 import functools
-from itertools import product
 
 import numpy as np
 import pandas as pd
-from pandas import Series, DataFrame
+
+from pyfinance import utils
 
 
-def _add_freq(obj, freq):
-    idx = obj.index.copy()
-    if not isinstance(obj, (pd.DatetimeIndex, pd.PeriodIndex)):
-        return idx
-    if obj.index.freq is None:
+def _add_freq(idx, freq=None, inplace=False):
+    """Ensure Index of the DataFrame or Series has a frequency.
+
+    We can't do many time-aware calculations within a valid Index freq.
+
+    Rule hierarchy:
+    1. If `idx` is not a DatetimeIndex or PeriodIndex, return it unchanged.
+    2. If `idx` already has a frequency, do nothing.
+    3. If a frequency is explicitly passed, use it.
+    4. If no frequency is passed, attempt to infer.
+    5. If (2) and (3) fail, raise.
+
+    Parameters
+    ----------
+    idx : pd.Index-like
+    freq : str
+    inplace : bool
+        If True, modify `idx` inplace and return None.  Otherwise,
+        return modified copy.
+
+    Example
+    -------
+    >>> import pandas as pd
+    >>> idx = pd.Index([pd.datetime(2000, 1, 2),
+                        pd.datetime(2000, 1, 3),
+                        pd.datetime(2000, 1, 4)])
+    >>> idx.freq is None
+    True
+    >>> _add_freq(idx).freq
+    <Day>
+    >>> type(_add_freq(idx).freq)
+    pandas.tseries.offsets.Day
+    """
+
+    if not inplace:
+        idx = idx.copy()
+    if not isinstance(idx, (pd.DatetimeIndex, pd.PeriodIndex)):
+        # Nothing more we can do.
+        if not inplace:
+            return idx
+    if idx.freq is not None:
+        if not inplace:
+            return idx
+    else:
         if freq is None:
-            # First try to infer
-            freq = pd.infer_freq(obj.index)  # yields "M'
-        # Use our passed freq
+            # First try to infer.  This will raise ValueError if fails.
+            freq = pd.infer_freq(idx)  # = str
+        # Now convert this to a Pandas offset.
         freq = pd.tseries.frequencies.to_offset(freq)
-        # TODO: some error handling here (no freq specified
-        # and we can't infer one)
-    # Don't change the frequency when there already is one
     idx.freq = freq
-    return idx
+    if not inplace:
+        return idx
 
 
-def to_series(obj):
-    # Don't check with `.squeeze()`; this would return a scalar for
-    #     1-sized Series.
-    if isinstance(obj, Series):
-        return obj.copy()
-    elif isinstance(obj, DataFrame) and obj.shape[-1] == 1:
-        # Returns: _Returns
+def try_to_squeeze(obj, raise_=False):
+    """Attempt to squeeze to 1d Series."""
+    if isinstance(obj, pd.Series):
+        return obj
+    elif isinstance(obj, pd.DataFrame) and obj.shape[-1] == 1:
         return obj.squeeze()
     else:
-        raise NotImplementedError('currently only supports...')
+        if raise_:
+            raise ValueError('Input cannot be squeezed.')
+        return obj
 
 
-def convertfreq(freq):
-    """Convert string frequencies to periods per year."""
-    freq = freq.upper()
-    days = ('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')
-    months = ('JAN', 'FEB', 'MAR',
-              'APR', 'MAY', 'JUN',
-              'JUL', 'AUG', 'SEP',
-              'OCT', 'NOV', 'DEC')
-
-    weekoffsets = ['W-%s' % d for d in days]
-    qtroffsets = ('Q-', 'QS-', 'BQ-', 'BQS-')
-    qtroffsets = [i+j for i, j in product(qtroffsets, months)]
-    annoffsets = ('A-', 'AS-', 'BA-', 'BAS-')
-    annoffsets = [i+j for i, j in product(annoffsets, months)]
-
-    freqs = {'D': 252., 'W': 52., 'M': 12., 'Q': 4., 'A': 1.}
-    freqs.update(zip(weekoffsets, [52.] * len(weekoffsets)))
-    freqs.update(zip(qtroffsets, [4.] * len(qtroffsets)))
-    freqs.update(zip(annoffsets, [1.] * len(annoffsets)))
-    return freqs[freq]
-
-
-class _Returns(Series):
+class _Returns(pd.Series):
 
     _metadata = ['freq', 'fmt']
 
@@ -115,6 +135,8 @@ class _Returns(Series):
 
     @property
     def _constructor(self):
+        # Used when a manipulation result has the same dimesions
+        # as the original.
         def f(*args, **kw):
             ss = _Returns(*args, **kw)
             self._copy_attrs(ss)
@@ -124,6 +146,11 @@ class _Returns(Series):
     @property
     def _constructor_expanddim(self):
         return Returns
+
+    @property
+    def _constructor_sliced(self):
+        # TODO: do we need anything here?
+        raise NotImplementedError
 
     # New public methods
     # ------------------
@@ -146,7 +173,7 @@ class _Returns(Series):
 
     def geomean(self):
         """Geometric mean return, a scalar for each security."""
-        return self.ret_rels().prod() ** (1./self.count()) - 1.
+        return self.ret_rels().prod() ** (1. / self.count()) - 1.
 
     def anlzd_ret(self):
         """Annualized return."""
@@ -154,7 +181,7 @@ class _Returns(Series):
         end = self.index[-1]
         td = end - start
         n = (td.days - 1) / 365.
-        return self.ret_rels().prod() ** (1./n) - 1.
+        return self.ret_rels().prod() ** (1. / n) - 1.
 
     # def drawdown_idx(self):
     #     """Drawdown index."""
@@ -166,7 +193,7 @@ class _Returns(Series):
     #     return self.drawdown_idx().min()
 
     def anlzd_std(self, ddof=0):
-        n = convertfreq(self.index.freq.freqstr)
+        n = utils.convertfreq(self.index.freq.freqstr)
         return self.std(ddof=ddof) * np.sqrt(n)
 
     # def rollup(self, freq):
@@ -174,7 +201,7 @@ class _Returns(Series):
     #     return self.resample(freq).apply(lambda f: Returns(f).cum_ret())
 
 
-class Returns(DataFrame):
+class Returns(pd.DataFrame):
     _metadata = ['freq', 'fmt']
 
     def __init__(self, *args, **kwargs):
@@ -198,6 +225,8 @@ class Returns(DataFrame):
 
     @property
     def _constructor(self):
+        # Used when a manipulation result has the same dimesions
+        # as the original.
         def f(*args, **kwargs):
             obj = Returns(*args, **kwargs)
             self._copy_attrs(obj)
@@ -206,10 +235,12 @@ class Returns(DataFrame):
 
     @property
     def _constructor_sliced(self):
+        # Used when a manipulation result has one lower dimension(s)
+        # as the original, such as DataFrame single columns slicing.
         return _Returns
 
     # New methods
-    # ---------------------
+    # -----------------------------------------------------------------
 
     def ret_rels(self):
         """Return-relatives, 1+r."""
@@ -249,7 +280,7 @@ class Returns(DataFrame):
         return self.drawdown_idx().min()
 
     def anlzd_std(self, ddof=0):
-        n = convertfreq(self.index.freq.freqstr)
+        n = utils.convertfreq(self.index.freq.freqstr)
         return self.std(ddof=ddof).mul(np.sqrt(n))
 
     def rollup(self, freq):
@@ -289,7 +320,7 @@ class Returns(DataFrame):
 
     def _mkt_filter(self, benchmark, threshold, op, incl_bm=False):
         # Note: this drops; it is *not* an NaN mask
-        benchmark = to_series(benchmark)
+        benchmark = try_to_squeeze(benchmark)
         if not isinstance(benchmark, (Returns, _Returns)):
             raise ValueError
         op = getattr(benchmark, op)
@@ -314,7 +345,7 @@ class Returns(DataFrame):
         return self[self.lt(threshold)].count().div(self.count())
 
     def excess_ret(self, benchmark):
-        benchmark = to_series(benchmark)
+        benchmark = try_to_squeeze(benchmark)
         return self.sub(benchmark, axis=0)
 
     def tracking_err(self, benchmark, ddof=0):
@@ -345,7 +376,7 @@ class Returns(DataFrame):
         from pyfinance import datasets  # noqa
         # TODO: careful with self.freq, could be None
         # TODO: load_rf calls `rollup`, circularity
-        rf = to_series(Returns(datasets.load_rf(freq=self.freq).dropna()))
+        rf = try_to_squeeze(Returns(datasets.load_rf(freq=self.freq).dropna()))
         return rf
 
     def sharpe(self, ddof=0):

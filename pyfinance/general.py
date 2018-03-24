@@ -405,17 +405,17 @@ def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
 
     Example
     -------
-    import pandas as pd
-    np.random.seed(123)
+    >>> import pandas as pd
+    >>> np.random.seed(123)
 
     # Our bootstrapped histogram should approximate these freqs
-    print(ewm_weights(10, alpha=.10))
+    >>> ewm_weights(10, alpha=.10)
     [ 0.05948221  0.06609135  0.07343483  0.08159426  0.09066029  0.10073365
       0.11192628  0.12436253  0.13818059  0.15353399]
 
-    res = ewm_bootstrap(np.arange(10), size=int(1e6), alpha=.10)
-    res = pd.Series(res).value_counts()
-    print((res / res.sum()).head())
+    >>> res = ewm_bootstrap(np.arange(10), size=int(1e6), alpha=.10)
+    >>> res = pd.Series(res).value_counts()
+    >>> (res / res.sum()).head()
     9    0.15323
     8    0.13834
     7    0.12424

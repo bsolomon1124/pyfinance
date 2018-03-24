@@ -250,7 +250,7 @@ class OLS(object):
         """Standard errors (SE) for all parameters, including the intercept."""
         x = np.matrix(self.x)
         err = np.atleast_1d(self.ms_err)
-        se = np.sqrt(np.diagonal(np.linalg.inv(x.T * x)) * err[:,np.newaxis])
+        se = np.sqrt(np.diagonal(np.linalg.inv(x.T * x)) * err[:, None])
         return np.squeeze(se)
 
     @property
@@ -476,7 +476,7 @@ class RollingOLS(object):
     def _se_all(self):
         """Standard errors (SE) for all parameters, including the intercept."""
         err = np.expand_dims(self._ms_err, axis=1)
-        t1 = np.diagonal(np.linalg.inv(np.matmul(self.xwins.swapaxes(1,2),
+        t1 = np.diagonal(np.linalg.inv(np.matmul(self.xwins.swapaxes(1, 2),
                                                  self.xwins)),
                          axis1=1, axis2=2)
         return np.squeeze(np.sqrt(t1 * err))
@@ -526,10 +526,10 @@ class RollingOLS(object):
     @property
     def _condition_number(self):
         """Condition number of x; ratio of largest to smallest eigenvalue."""
-        ev = np.linalg.eig(np.matmul(self.xwins.swapaxes(1,2), self.xwins))[0]
+        ev = np.linalg.eig(np.matmul(self.xwins.swapaxes(1, 2), self.xwins))[0]
         return np.sqrt(ev.max(axis=1) / ev.min(axis=1))
 
-    #-------------------------------------------------------------------------
+    # -----------------------------------------------------------------
     # "Public" results
 
     @property

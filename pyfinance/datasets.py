@@ -148,14 +148,15 @@ def load_factors(pickle_from=None, pickle_to=None):
     for i in ['BETA', 'AC', 'VAR', 'RESVAR']:
         ser = pdr.DataReader('25_Portfolios_ME_' + i + '_5x5', 'famafrench',
                              DSTART)[0]
-        ser = ser.iloc[:, [0,5,10,15,20]].mean(axis=1)\
-            - ser.iloc[:, [4,9,14,19,24]].mean(axis=1)
+        ser = ser.iloc[:, [0, 5, 10, 15, 20]].mean(axis=1)\
+            - ser.iloc[:, [4, 9, 14, 19, 24]].mean(axis=1)
         ser = ser.rename(i)
         tgt.append(ser)
 
     # E/P, CF/P, D/P (univariate sorts, quintile spreads)
     for i in ['E-P', 'CF-P', 'D-P']:
-        ser = pdr.DataReader('Portfolios_Formed_on_' + i, 'famafrench', DSTART)[0]
+        ser = pdr.DataReader('Portfolios_Formed_on_' + i, 'famafrench',
+                             DSTART)[0]
         ser = ser.loc[:, 'Hi 20'] - ser.loc[:, 'Lo 20']
         ser = ser.rename(i)
         tgt.append(ser)
@@ -207,7 +208,7 @@ def load_factors(pickle_from=None, pickle_to=None):
     put2 = pd.read_csv(link2, index_col=0, parse_dates=True, skiprows=7,
                        header=None).rename_axis('DATE')
     put = pd.concat((put1, put2))\
-        .rename(columns={1 : 'PUT'})\
+        .rename(columns={1: 'PUT'})\
         .iloc[:, 0]\
         .asfreq('D', method='ffill')\
         .fillna(method='ffill')\
@@ -377,7 +378,7 @@ def load_rates(freq='D', pickle_from=None, pickle_to=None):
         + ['Non-Fncl CP'] * 3 + ['Short Rates'] * 3
 
     l2 = ['%sm' % m for m in months] + ['%sy' % y for y in years] \
-        + ['%sy'% y for y in years[3:7]] \
+        + ['%sy' % y for y in years[3:7]] \
         + 2 * ['%sm' % m for m in range(1, 4)] \
         + ['Fed Funds', 'Prime Rate', 'Primary Credit']
 
@@ -495,7 +496,8 @@ def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
     res = returns.prep(res, in_format='dec', name='RF', freq='D')
 
     if freq != 'D':
-        res = returns.prep(res.rollup(out_freq=freq), in_format='dec', freq=freq)
+        res = returns.prep(res.rollup(out_freq=freq), in_format='dec',
+                           freq=freq)
 
     return res
 

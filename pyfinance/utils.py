@@ -109,8 +109,8 @@ def appender(defaultdocs, passed_to=None):
         params = inspect.signature(func).parameters
         params = [param.name for param in params.values()]
         msg = '\n**kwargs : passed to `%s`'
-        params = ''.join([textwrap.dedent(defaultdocs
-                   .get(param, msg % passed_to)) for param in params])
+        params = ''.join([textwrap.dedent(defaultdocs.get(
+            param, msg % passed_to)) for param in params])
         func.__doc__ += '\n\nParameters\n' + 10 * '=' + params
         return func
 
@@ -120,8 +120,8 @@ def appender(defaultdocs, passed_to=None):
 def avail(df):
     """Return start & end availability for each column in a DataFrame."""
     avail = DataFrame({
-        'start' : df.apply(lambda col: col.first_valid_index()),
-        'end' : df.apply(lambda col: col.last_valid_index())
+        'start': df.apply(lambda col: col.first_valid_index()),
+        'end': df.apply(lambda col: col.last_valid_index())
                      })
     return avail[['start', 'end']]
 
@@ -461,8 +461,8 @@ def expanding_stdize(obj, **kwargs):
     9  0.15280 -0.73283 -0.84907
     """
 
-    return (obj - obj.expanding(**kwargs).mean()) \
-         / (obj.expanding(**kwargs).std())
+    return (obj - obj.expanding(**kwargs).mean())\
+        / (obj.expanding(**kwargs).std())
 
 
 def isiterable(obj):
@@ -479,10 +479,10 @@ def pickle_option(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         bound_args = sig.bind(*args, **kwargs)
-        pickle_from = bound_args.arguments.get('pickle_from', \
-                             sig.parameters['pickle_from'].default)
-        pickle_to = bound_args.arguments.get('pickle_to', \
-                             sig.parameters['pickle_to'].default)
+        pickle_from = bound_args.arguments.get(
+            'pickle_from', sig.parameters['pickle_from'].default)
+        pickle_to = bound_args.arguments.get(
+            'pickle_to', sig.parameters['pickle_to'].default)
 
         if pickle_from:
             with open(pickle_from + '.pickle', 'rb') as f:

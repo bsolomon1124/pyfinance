@@ -7,7 +7,7 @@ Versioning attempts to follow the specifications laid out in [PEP 440](https://w
 ## 0.3.0
 
 While technically a minor release, this update does have some immediate deprecations.
-- Scraping information on activeshare is fully deprecated; `load_activeshare()` and `scrub_activeshare()` have been removed from the `datasets` module.
+- Scraping information on active share is fully deprecated; `load_activeshare()` and `scrub_activeshare()` have been removed from the `datasets` module.
 - Scraping SEC filings by CIK lookup in `load_13f()` is removed.  Pass the url of the .xml directly.
 - Removed the `.diagram()` method of options strategies, which was just a light Matplotlib plotting wrapper.
 

@@ -28,6 +28,8 @@ Module               Description
 :code:`utils.py`     Utilities not fitting into any of the above.
 ===================  ===========
 
+Please note that :code:`returns` and :code:`general` are still in development; they are not thoroughly tested and have some `NotImplementedError` methods.
+
 ------------
 Installation
 ------------

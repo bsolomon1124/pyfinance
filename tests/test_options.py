@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # flake8: noqa
 
 # Test cases taken from:
@@ -69,7 +68,6 @@ def test_put_and_call():
 
 # Options strategies
 # ---------------------------------------------------------------------
-
 
 # Straddle', 'ShortStraddle', 'Strangle',
 #     'ShortStrangle', 'Strip', 'Strap', 'BullSpread', 'BearSpread',

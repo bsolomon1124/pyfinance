@@ -52,6 +52,7 @@ __all__ = [
     'unique_everseen', 'uniqify'
     ]
 
+from collections import Callable
 from functools import wraps
 import inspect
 import itertools
@@ -498,37 +499,54 @@ def pickle_option(func):
     return wrapper
 
 
-def public_dir(obj, underscores=1):
-    """Wrapper around `dir`, but designed to exclude (semi-) private methods.
+def public_dir(obj, max_underscores=0, type_=None):
+    """Like `dir()` with additional options for object inspection.
 
-    Return an alphabetized list of names comprising the attributes
-    of the given object, EXCEPT those starting with the specified number of
-    `underscores`.
+    Attributes
+    ----------
+    obj: object
+        Any object that could be passed to `dir()`
+    max_underscores: int, default 0
+        If > 0, names that begin with underscores repeated n or more
+        times will be excluded.
+    type_: None, sequence, str, or type
+        Filter to objects of these type(s) only.  if 'callable' or
+        'func' is passed, gets mapped to collections.Callable.  if the
+        string-version of a type (i.e. 'str') is passed, it gets
+        eval'd to its type.
 
-    Example
-    -------
-
-    class Cls:
-        def __init__(self):
-            self.a = 1
-            self._a = 2
-        def _helper(self):
-            pass
-        def __private__(self):
-            pass
-        def normfunc(self):
-            pass
-
-    c = Cls()
-    public_dir(c)
-    Out[16]: ['a', 'normfunc']
-
-    public_dir(c, 2)
-    Out[17]: ['_a', '_helper', 'a', 'normfunc']
+    Examples
+    --------
+    >>> import os
+    >>> # Get all public string constants from os.path
+        public_dir(os.path, max_underscores=1, type_=str)
+    ['curdir', 'defpath', 'devnull', 'extsep', 'pardir', 'pathsep', 'sep']
+    >>> # Get integer constants
+        public_dir(os.path, max_underscores=1, type_='int')
+    ['supports_unicode_filenames']
     """
 
-    underscores *= '_'
-    return [f for f in dir(obj) if not f.startswith(underscores)]
+    if max_underscores > 0:
+        cond1 = lambda i: not i.startswith('_' * max_underscores)  # noqa
+    else:
+        cond1 = lambda i: True  # noqa
+    if type_:
+        if isinstance(type_, str):
+            if type_ in ['callable', 'func', 'function']:
+                type_ = Callable
+            elif 'callable' in type_ or 'func' in type_:
+                type_ = [i if i not in ['callable', 'func', 'function']
+                         else Callable for i in type_]
+        if isinstance(type_, str):
+            # 'str' --> str (class `type`)
+            type_ = eval(type_)
+        elif not isinstance(type_, type):
+            type_ = [eval(i) if isinstance(i, str) else i for i in type_]
+        # else: we have isinstance(type_, type)
+        cond2 = lambda i: isinstance(getattr(obj, i), type_)  # noqa
+    else:
+        cond2 = lambda i: True  # noqa
+    return [i for i in dir(obj) if cond1(i) and cond2(i)]
 
 
 def random_tickers(length, n_tickers, endswith=None, letters=None,
@@ -572,6 +590,7 @@ def random_tickers(length, n_tickers, endswith=None, letters=None,
         # Only generate substrings up to `endswith`
         length = length - len(endswith)
     join = ''.join
+
     def yield_ticker(rand=random.choices):
         if endswith:
             while True:
@@ -579,6 +598,7 @@ def random_tickers(length, n_tickers, endswith=None, letters=None,
         else:
             while True:
                 yield join(rand(letters, k=length))
+
     tickers = itertools.islice(unique_everseen(yield_ticker()), n_tickers)
     return list(tickers)
 

@@ -21,6 +21,9 @@ the class constructor.
 .. _Subclassing Pandas Data Structures:
     https://pandas.pydata.org/pandas-docs/stable/internals.html
 
+.. _geopandas' GeoDataFrame:
+    https://github.com/geopandas/geopandas/blob/d3df5eb950d649367318aba1eded63050a6eeca1/geopandas/geodataframe.py#L18  # noqa
+
 Limitations
 -----------
 - This implementation currently supports only a 1-benchmark case.
@@ -34,7 +37,7 @@ Limitations
   object from an instance of `Returns`
 """
 
-__all__ = ['Returns']
+__all__ = ['TSeries', 'TFrame']
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 import copy
@@ -46,170 +49,224 @@ import pandas as pd
 from pyfinance import utils
 
 
-def _add_freq(idx, freq=None, inplace=False):
-    """Ensure Index of the DataFrame or Series has a frequency.
+# TODO: fmt
 
-    We can't do many time-aware calculations within a valid Index freq.
 
-    Rule hierarchy:
-    1. If `idx` is not a DatetimeIndex or PeriodIndex, return it unchanged.
-    2. If `idx` already has a frequency, do nothing.
-    3. If a frequency is explicitly passed, use it.
-    4. If no frequency is passed, attempt to infer.
-    5. If (2) and (3) fail, raise.
+class TSeries(pd.Series):
+    """A time series of periodic returns for a sinngle security.
+
+    Subclass of pandas.Series.
 
     Parameters
     ----------
-    idx : pd.Index-like
-    freq : str
-    inplace : bool
-        If True, modify `idx` inplace and return None.  Otherwise,
-        return modified copy.
+    freq : str or None, default None
+        Optionally, explicitly specify an Index frequency as str; for
+        example, 'M' denotes monthly frequency.
 
-    Example
-    -------
-    >>> import pandas as pd
-    >>> idx = pd.Index([pd.datetime(2000, 1, 2),
-                        pd.datetime(2000, 1, 3),
-                        pd.datetime(2000, 1, 4)])
-    >>> idx.freq is None
-    True
-    >>> _add_freq(idx).freq
-    <Day>
-    >>> type(_add_freq(idx).freq)
-    pandas.tseries.offsets.Day
+        Hierarchy:
+        - If `freq` is specified, it overrides the frequency of the
+        input Index.
+        - If None and the input Index has a frequency, use that.
+        - If None and the input Index has no frequency, attempt to
+        infer one.
+        - If all the above fails, `self.freq` is None.
+
+    fmt : {'dec', 'num'}
+        The "format" (representation) of the input returns.
+        'dec' means that 0.05 represents a 5% return.
+        'num' means that 5.00 represents a 5% return.
+        The same hierarchy applies for `fmt` as does for `freq`.
+
+    Note that **instance methods always return 'dec' format.**
     """
 
-    if not inplace:
-        idx = idx.copy()
-    if not isinstance(idx, (pd.DatetimeIndex, pd.PeriodIndex)):
-        # Nothing more we can do.
-        if not inplace:
-            return idx
-    if idx.freq is not None:
-        if not inplace:
-            return idx
-    else:
-        if freq is None:
-            # First try to infer.  This will raise ValueError if fails.
-            freq = pd.infer_freq(idx)  # = str
-        # Now convert this to a Pandas offset.
-        freq = pd.tseries.frequencies.to_offset(freq)
-    idx.freq = freq
-    if not inplace:
-        return idx
-
-
-def try_to_squeeze(obj, raise_=False):
-    """Attempt to squeeze to 1d Series."""
-    if isinstance(obj, pd.Series):
-        return obj
-    elif isinstance(obj, pd.DataFrame) and obj.shape[-1] == 1:
-        return obj.squeeze()
-    else:
-        if raise_:
-            raise ValueError('Input cannot be squeezed.')
-        return obj
-
-
-class _Returns(pd.Series):
-
+    # Normal properties; these will be passed to manipulation results.
     _metadata = ['freq', 'fmt']
 
     def __init__(self, *args, **kwargs):
-        # No fmt or freq here (yet)
-        # But may want to add later on
-        # We also can't use *.01 here...
-
-        # Note this implies that we can *never* call
-        # _Returns directly.  We only use it for slicing
-        # (_constructor_sliced) from Returns
+        # Copy because we would otherwise inadvertantly alter
+        # mutable arguments suc as Series, _Returns, lists.
         args = [copy.deepcopy(arg) for arg in args]
+        freq = kwargs.pop('freq', None)
+        fmt = kwargs.pop('fmt', 'dec')
         super().__init__(*args, **kwargs)
-        if len(args) == 1 and isinstance(args[0], _Returns):
-            args[0]._copy_attrs(self)
 
-    def _copy_attrs(self, obj):
-        for attr in self._metadata:
-            obj.__dict__[attr] = getattr(self, attr, None)
+        # Deal with cases where a Series or TSeries is passed;
+        # we want to (try) to take on its `freq` and `fmt`.
+        data = args[0]
+        is_series_like = isinstance(data, (TSeries, pd.Series))
+        if not is_series_like:
+            self.freq = freq
+            self.fmt = fmt
+        else:
+            # TODO: just take on `data`'s `freq` and return None
+            # Tested that we aren't mutating a view here.
+            _add_freq(self.index, inplace=True)
+            # Now, we need to extract `fmt` and `freq` (str) from this.
+            if self.index.freq:
+                self.freq = self.index.freq.freqstr
+            else:
+                # `self.index.freq` is None
+                self.freq = freq
+            # If we're passed a Tseries, also attempt to grab its `fmt`.
+            if isinstance(data, TSeries):
+                self.fmt = data.fmt
+            else:
+                self.fmt = fmt
+
+        # Make a final pass at getting str attributes.
+        # This covers cases where the frequency is derived from
+        # the index passed to Series(), i.e.
+        # r = TSeries(s, index=pd.date_range('2017', periods=20, freq='M'))
+        if self.index.freq and not self.freq:
+            self.freq = self.index.freq.freqstr
 
     @property
     def _constructor(self):
-        # Used when a manipulation result has the same dimesions
-        # as the original.
-        def f(*args, **kw):
-            ss = _Returns(*args, **kw)
-            self._copy_attrs(ss)
-            return ss
-        return f
+        return TSeries
 
     @property
     def _constructor_expanddim(self):
-        return Returns
+        return TFrame
 
-    @property
-    def _constructor_sliced(self):
-        # TODO: do we need anything here?
-        raise NotImplementedError
+    # We don't need _constructor_sliced; it raises NotImplementedError
+    # by default.
 
-    # New public methods
-    # ------------------
+    # "New" public methods
+    # -----------------------------------------------------------------
 
     def ret_rels(self):
-        """Return-relatives, 1+r."""
+        """Return-relatives, 1 + r.
+
+        Returns
+        -------
+        TSeries
+        """
+
         return self.add(1.)
 
     def ret_idx(self, base=1.0):
-        """Return index with starting value of `base`."""
+        """Return index with starting value of `base`.
+
+        Returns
+        -------
+        TSeries
+        """
+
         return self.ret_rels().cumprod().mul(base)
 
     def cum_ret_idx(self):
-        """Cumulative return index.  ==ret_idx-1"""
+        """Cumulative return index; equal to `self.ret_idx() - 1.
+
+        Returns
+        -------
+        TSeries
+        """
+
         return self.ret_idx().sub(1.)
 
+    def growth_of_x(self, x=1.0):
+        """Growth of a starting amount of `x`.
+
+        Returns
+        -------
+        float
+        """
+
+        prod = self.ret_rels().prod() * x
+        assert prod > 0, 'TODO'
+        return prod
+
     def cum_ret(self):
-        """Cumulative return, a scalar for each security."""
-        return self.ret_rels().prod() - 1.
+        """Cumulative return.
+
+        Returns
+        -------
+        float
+        """
+
+        return self.growth_of_x() - 1.
 
     def geomean(self):
-        """Geometric mean return, a scalar for each security."""
+        """Geometric mean return, a scalar.
+
+        Returns
+        -------
+        float
+        """
+
         return self.ret_rels().prod() ** (1. / self.count()) - 1.
 
     def anlzd_ret(self):
-        """Annualized return."""
+        """Annualized return.
+
+        Returns
+        -------
+        float
+        """
+
         start = self.index[0] - 1
         end = self.index[-1]
         td = end - start
-        n = (td.days - 1) / 365.
+        n = (td.days - 1.) / 365.
         return self.ret_rels().prod() ** (1. / n) - 1.
 
-    # def drawdown_idx(self):
-    #     """Drawdown index."""
-    #     ri = self.ret_idx()
-    #     return ri.div(ri.cummax()).sub(1.)
+    def drawdown_idx(self):
+        """Percentage drawdown from the cumulative high.
 
-    # def max_drawdown(self):
-    #     """Maximum drawdown."""
-    #     return self.drawdown_idx().min()
+        Returns
+        -------
+        TSeries
+        """
+
+        ri = self.ret_idx()
+        return ri.div(ri.cummax()).sub(1.)
+
+    def max_drawdown(self):
+        """Maximum drawdown.
+
+        Returns
+        -------
+        float
+        """
+
+        return self.drawdown_idx().min()
 
     def anlzd_std(self, ddof=0):
-        n = utils.convertfreq(self.index.freq.freqstr)
+        """Annualized standard deviation with `ddof` degrees of freedom.
+
+        Parameters
+        ----------
+        ddof : int, default 0
+            Degrees of freedom.  Passed to `self.std()`
+        """
+
+        n = utils.convertfreq(self.freq)
         return self.std(ddof=ddof) * np.sqrt(n)
 
-    # def rollup(self, freq):
-    #     """Downsample returns through geometric linking."""
-    #     return self.resample(freq).apply(lambda f: Returns(f).cum_ret())
+    def rollup(self, freq):
+        """Downsample returns through geometric linking.
+
+        Returns
+        -------
+        TSeries
+        """
+
+        # TODO: this may switch to an alias, something like
+        # self.freq = 'Q-DEC'.
+        return TSeries(self.resample(freq).apply(lambda f: f.cum_ret()),
+                       freq=freq, fmt=self.fmt)
 
 
-class Returns(pd.DataFrame):
+class TFrame(pd.DataFrame):
     _metadata = ['freq', 'fmt']
 
     def __init__(self, *args, **kwargs):
         freq = kwargs.pop('freq', None)
         fmt = kwargs.pop('fmt', 'dec')
         args = [copy.deepcopy(arg) for arg in args]
-        super(Returns, self).__init__(*args, **kwargs)
-        if len(args) == 1 and isinstance(args[0], Returns):
+        super().__init__(*args, **kwargs)
+        if len(args) == 1 and isinstance(args[0], TFrame):
             args[0]._copy_attrs(self)
         self.freq = freq
         self.fmt = fmt
@@ -228,7 +285,7 @@ class Returns(pd.DataFrame):
         # Used when a manipulation result has the same dimesions
         # as the original.
         def f(*args, **kwargs):
-            obj = Returns(*args, **kwargs)
+            obj = TFrame(*args, **kwargs)
             self._copy_attrs(obj)
             return obj
         return f
@@ -237,7 +294,7 @@ class Returns(pd.DataFrame):
     def _constructor_sliced(self):
         # Used when a manipulation result has one lower dimension(s)
         # as the original, such as DataFrame single columns slicing.
-        return _Returns
+        return TSeries
 
     # New methods
     # -----------------------------------------------------------------
@@ -285,7 +342,7 @@ class Returns(pd.DataFrame):
 
     def rollup(self, freq):
         """Downsample returns through geometric linking."""
-        return self.resample(freq).apply(lambda f: Returns(f).cum_ret())
+        return self.resample(freq).apply(lambda f: TFrame(f).cum_ret())
 
     def drawdown_end(self):
         """The trough date at which drawdown was most negative."""
@@ -320,8 +377,8 @@ class Returns(pd.DataFrame):
 
     def _mkt_filter(self, benchmark, threshold, op, incl_bm=False):
         # Note: this drops; it is *not* an NaN mask
-        benchmark = try_to_squeeze(benchmark)
-        if not isinstance(benchmark, (Returns, _Returns)):
+        benchmark = _try_to_squeeze(benchmark)
+        if not isinstance(benchmark, (TFrame, TSeries)):
             raise ValueError
         op = getattr(benchmark, op)
         mask = op(threshold).values
@@ -345,7 +402,7 @@ class Returns(pd.DataFrame):
         return self[self.lt(threshold)].count().div(self.count())
 
     def excess_ret(self, benchmark):
-        benchmark = try_to_squeeze(benchmark)
+        benchmark = _try_to_squeeze(benchmark)
         return self.sub(benchmark, axis=0)
 
     def tracking_err(self, benchmark, ddof=0):
@@ -376,7 +433,7 @@ class Returns(pd.DataFrame):
         from pyfinance import datasets  # noqa
         # TODO: careful with self.freq, could be None
         # TODO: load_rf calls `rollup`, circularity
-        rf = try_to_squeeze(Returns(datasets.load_rf(freq=self.freq).dropna()))
+        rf = _try_to_squeeze(TFrame(datasets.load_rf(freq=self.freq).dropna()))
         return rf
 
     def sharpe(self, ddof=0):
@@ -397,7 +454,7 @@ class Returns(pd.DataFrame):
         return slf.gt(bm, axis=0).sum() / slf.count()
 
     # Incomplete
-    # -----------
+    # -----------------------------------------------------------------
 
     def excess_drawdown_idx(self, benchmark, **kwargs):
         raise NotImplementedError
@@ -449,3 +506,75 @@ class Returns(pd.DataFrame):
 
     def rsq_adj(self, benchmark):
         raise NotImplementedError
+
+
+def _add_freq(idx, freq=None, inplace=False):
+    """Ensure Index of the DataFrame or Series has a frequency.
+
+    We can't do many time-aware calculations within a valid Index freq.
+
+    Rule hierarchy:
+    1. If `idx` is not a DatetimeIndex or PeriodIndex, return it unchanged.
+    2. If `idx` already has a frequency, do nothing.
+    3. If a frequency is explicitly passed, use it.
+    4. If no frequency is passed, attempt to infer.
+    5. If (2) and (3) fail, raise.
+
+    Parameters
+    ----------
+    idx : pd.Index-like
+    freq : str
+    inplace : bool
+        If True, modify `idx` inplace and return None.  Otherwise,
+        return modified copy.
+
+    Example
+    -------
+    >>> import pandas as pd
+    >>> idx = pd.Index([pd.datetime(2000, 1, 2),
+                        pd.datetime(2000, 1, 3),
+                        pd.datetime(2000, 1, 4)])
+    >>> idx.freq is None
+    True
+    >>> _add_freq(idx).freq
+    <Day>
+    >>> type(_add_freq(idx).freq)
+    pandas.tseries.offsets.Day
+    """
+
+    if not inplace:
+        idx = idx.copy()
+    if not isinstance(idx, (pd.DatetimeIndex, pd.PeriodIndex)):
+        # Nothing more we can do.
+        if not inplace:
+            return idx
+    if idx.freq is not None:
+        freq = idx.freq
+        if not inplace:
+            return idx
+    else:
+        if freq is None:
+            # First try to infer.  This will raise ValueError if fails.
+            freq = pd.infer_freq(idx)  # = str
+        # Now convert this to a Pandas offset.
+        freq = pd.tseries.frequencies.to_offset(freq)
+    idx.freq = freq
+    if not inplace:
+        return idx
+
+
+def _try_to_squeeze(obj, raise_=False):
+    """Attempt to squeeze to 1d Series."""
+    if isinstance(obj, pd.Series):
+        return obj
+    elif isinstance(obj, pd.DataFrame) and obj.shape[-1] == 1:
+        return obj.squeeze()
+    else:
+        if raise_:
+            raise ValueError('Input cannot be squeezed.')
+        return obj
+
+
+def _check_fmt(obj, fmt):
+    """Make sure `fmt` makes sense based on values of `obj`."""
+    raise NotImplementedError

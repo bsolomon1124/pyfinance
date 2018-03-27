@@ -1,40 +1,24 @@
 """Statistical analysis of security returns time series.
 
 Intended to mimic functionality of commercial software such as FactSet,
-Axioma, & Zephyr and open-source software such as Pyfolio.
+Axioma, & Zephyr and open-source software such as Pyfolio and ffn.
 
-The main class of this module is `Returns`, a subclassed Pandas
-DataFrame.  It implements a collection of new methods that pertain
-specifically to the study of security returns, such as cumulative
-return indices, annualized volatility, and drawdown.
+The main classes of this module are
+
+- TSeries, a subclassed Pandas Series, and
+- TFrame, a subclassed Pandas DataFrame.
+
+They implement a collection of new methods that pertain specifically to
+investment management and the study of security returns and asset
+performance, such cumulative return indices and drawdown.
 
 Note
 ----
-The Pandas developers recommend against subclassing a DataFrame in
-favor of "piping" method chaining or using composition.
-
-However, these two alternatives are suboptimal here, and quasi-private
-magic is built-in here to protect against some common pitfalls,
-such as mutation of the Pandas DataFrame that is passed to
-the class constructor.
+Subclassing Pandas objects is a delicate operation, but in this case
+is strictly preferrable to composition or piping.
 
 .. _Subclassing Pandas Data Structures:
     https://pandas.pydata.org/pandas-docs/stable/internals.html
-
-.. _geopandas' GeoDataFrame:
-    https://github.com/geopandas/geopandas/blob/d3df5eb950d649367318aba1eded63050a6eeca1/geopandas/geodataframe.py#L18  # noqa
-
-Limitations
------------
-- This implementation currently supports only a 1-benchmark case.
-  Methods that have a `benchmark` parameter take an instance
-  of `Returns` that is a single-column DataFrame.  (Under the
-  hood, this is converted to a subclassed Series.)  Accomodating
-  multiple benchmarks by using a MultiIndex result is a
-  work-in-progress.
-- Support for rolling statistics is currently limited.
-  However, it is still possible to create a rolling factory/
-  object from an instance of `Returns`
 """
 
 __all__ = ['TSeries', 'TFrame']

@@ -4,6 +4,10 @@ Changes prior to version 0.2.0 are untracked.
 
 Versioning attempts to follow the specifications laid out in [PEP 440](https://www.python.org/dev/peps/pep-0440/).
 
+## 1.0.0
+
+This release overhauled `returns.py` in a backwards-incompatible manner.  It also added several NumPy wrapper functions to `utils.py`.
+
 ## 0.3.0
 
 While technically a minor release, this update does have some immediate deprecations.

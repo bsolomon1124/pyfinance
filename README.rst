@@ -33,7 +33,7 @@ Installation
 ------------
 
 pyfinance is available via `PyPI
-<https://pypi.python.org/pypi/pyfinance/>`_.  The latest version is 0.3.1 as of March 2018.:  Install with pip::
+<https://pypi.python.org/pypi/pyfinance/>`_.  The latest version is 1.0.1 as of March 2018.:  Install with pip::
 
     $ pip3 install pyfinance
 

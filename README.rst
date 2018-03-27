@@ -9,8 +9,6 @@ It is meant to be a complement to existing packages geared towards quantitative 
 <https://github.com/pydata/pandas-datareader>`_, and `fecon235
 <https://github.com/rsvp/fecon235>`_.
 
-**Note**: pyfinance aims for compatability with all minor releases of Python 3.x, but does not guarantee workability with Python 2.x.
-
 --------
 Contents
 --------
@@ -28,7 +26,7 @@ Module               Description
 :code:`utils.py`     Utilities not fitting into any of the above.
 ===================  ===========
 
-Please note that :code:`returns` and :code:`general` are still in development; they are not thoroughly tested and have some `NotImplementedError` methods.
+Please note that :code:`returns` and :code:`general` are still in development; they are not thoroughly tested and have some NotImplemented features.
 
 ------------
 Installation
@@ -38,6 +36,8 @@ pyfinance is available via `PyPI
 <https://pypi.python.org/pypi/pyfinance/>`_.  The latest version is 0.3.1 as of March 2018.:  Install with pip::
 
     $ pip3 install pyfinance
+
+**Note**: pyfinance aims for compatability with all minor releases of Python 3.x, but does not guarantee workability with Python 2.x.
 
 ------------
 Dependencies
@@ -53,39 +53,107 @@ Tutorial
 
 This is a walkthrough of some of pyfinance's features.
 
-The :code:`utils.py` module contains odds-and-ends utilities.
+The :code:`returns.py` module is designed for statistical analysis of financial time series through the CAPM framework, designed to mimic functionality of software such as FactSet Research Systems and Zephyr, with improved speed and flexibility.
+
+Its main class is :code:`TSeries`, a subclassed Pandas Series.  The DataFrame equivalent, :code:`TFrame`, is not yet implemented as of March 2018.
+
+:code:`TSeries` implements a collection of new methods that pertain specifically to investment management and the study of security returns and asset performance, such cumulative return indices and drawdown.
+
+Here's an example of construction:
 
 .. code:: python3
 
-    >>> from pyfinance import utils
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from pyfinance import TSeries
 
-    # Generate 7 unique 5-letter mutual fund tickers
-    >>> utils.random_tickers(length=5, n_tickers=7, endswith='X')
-    ['JXNQX', 'DPTJX', 'WAKOX', 'DZIHX', 'MDYXX', 'HSKWX', 'IDMZX']
+    >>> np.random.seed(444)
 
-    # Same for ETFs
-    >>> utils.random_tickers(3, 8)
-    ['FIS', 'FNN', 'FZC', 'PWV', 'PBA', 'RDG', 'BKY', 'CDW']
+    # Normally distributed with 0.08% daily drift term.
+    >>> s = np.random.randn(400) / 100 + 0.0008
+    >>> idx = pd.date_range(start='2016', periods=len(s))  # default daily freq.
+    >>> ts = TSeries(s, index=idx)
 
-    # Five-asset portfolio leveraged 1.5x.
-    >>> utils.random_weights(size=5, sumto=1.5)
-    array([0.3263, 0.1763, 0.4703, 0.4722, 0.0549])
+    >>> ts.head()
+    2016-01-01    0.0044
+    2016-01-02    0.0046
+    2016-01-03    0.0146
+    2016-01-04    0.0126
+    2016-01-05   -0.0086
+    Freq: D, dtype: float64
 
-    # Two 7-asset portfolios leverage 1.0x and 1.5x, respectively.
-    >>> utils.random_weights(size=(2, 7), sumto=[1., 1.5])
-    array([[0.1418, 0.2007, 0.0255, 0.2575, 0.0929, 0.2272, 0.0544],
-           [0.3041, 0.109 , 0.2561, 0.2458, 0.3001, 0.0333, 0.2516]])
+And a few "new" methods:
 
-    >>> utils.random_weights(size=(2, 7), sumto=[1., 1.5]).sum(axis=1)
-    array([1. , 1.5])
+.. code:: python3
 
-    # Convert Pandas offset alises to periods per year.
-    >>> from pyfinance import utils
+    >>> ts.max_drawdown()
+    -0.12374551561531844
 
-    >>> utils.convertfreq('M')
-    12.0
-    >>> utils.convertfreq('BQS-DEC')
-    4.0
+    # Downsample to quarterly compounded returns.
+    >>> ts.rollup('Q')
+    2016-03-31    0.0450
+    2016-06-30    0.1240
+    2016-09-30    0.0631
+    2016-12-31   -0.0081
+    2017-03-31    0.1925
+    Freq: Q-DEC, dtype: float64
+
+    >>> ts.anlzd_stdev()
+    0.16318780660107757
+
+    >>> ts.sharpe_ratio(ddof=1)
+    2.501797257311737
+
+Some statistics are benchmark-relative.  For methods that take a :code:`benchmark` parameter, :code:`benchmark` can be either another :code:`TSeries`, a Pandas Series, a 1d NumPy array.
+
+.. code:: python3
+
+    >>> bmk = TSeries(np.random.randn(400) / 100 + .0005,
+    ...               index=ts.index)
+    >>> ts.beta_adj(bmk)
+    0.3176455956603447
+
+    >>> ts.tracking_error(benchmark=bmk)
+    0.23506660057562254
+
+With CAPM-related statistics such as alpha, beta, and R-squared, it can also be a Pandas DataFrame or 2d NumPy array.
+
+.. code:: python3
+
+    >>> multi_bmk = pd.DataFrame(np.random.randn(400, 2) / 100 + .0005,
+    ...                          index=ts.index)
+
+    # Multifactor model support.
+    >>> ts.alpha(multi_bmk)
+    0.0010849614688207107
+
+:code:`TSeries` comes with just one additional and optional argument that must be as a keyword argument: :code:`freq` (default :code:`None`) allows for manual specification of the time-series frequency.  It may be any frequency string or anchored offset string recognized by Pandas, such as 'D', '5D', 'Q', 'Q-DEC', or 'BQS-APR'.
+
+.. code:: python3
+
+    # This is okay as long as a frequency can be inferred.
+    >>> ts.freq is None
+    True
+
+The purpose of this extra parameter is to create an annualization factor for statistics that are given on an annualized basis, such as standard deviation.
+
+If no frequency is passed explicitly, pyfinance will attempt to infer an annualization factor from the Index, with an exception being raised if neither of these yield a frequency.
+
+.. code:: python3
+
+    >>> no_idx = TSeries(np.random.laplace(size=24) * .01 + .005,
+                         freq='M')
+
+    >>> no_idx.freq
+    'M'
+
+    >>> no_idx.anlzd_ret()
+    0.04975219957136123
+
+:code:`freq` can also be passed within some methods, which will override the class instance's :code:`.freq` if it exists:
+
+    >>> no_idx.anlzd_ret(freq='W')  # Treat `no_idx` as weekly returns.
+    0.2341731795205313
 
 :code:`datasets.py` provides for financial dataset download & assembly via :code:`requests`.  It leverages sources including:
 
@@ -325,6 +393,40 @@ Here is an example of constructing a bear spread, which is a combination of 2 pu
 
     >>> spread.profit()
     array([-51.38,  -1.38,  48.62])
+
+The :code:`utils.py` module contains odds-and-ends utilities.
+
+.. code:: python3
+
+    >>> from pyfinance import utils
+
+    # Generate 7 unique 5-letter mutual fund tickers
+    >>> utils.random_tickers(length=5, n_tickers=7, endswith='X')
+    ['JXNQX', 'DPTJX', 'WAKOX', 'DZIHX', 'MDYXX', 'HSKWX', 'IDMZX']
+
+    # Same for ETFs
+    >>> utils.random_tickers(3, 8)
+    ['FIS', 'FNN', 'FZC', 'PWV', 'PBA', 'RDG', 'BKY', 'CDW']
+
+    # Five-asset portfolio leveraged 1.5x.
+    >>> utils.random_weights(size=5, sumto=1.5)
+    array([0.3263, 0.1763, 0.4703, 0.4722, 0.0549])
+
+    # Two 7-asset portfolios leverage 1.0x and 1.5x, respectively.
+    >>> utils.random_weights(size=(2, 7), sumto=[1., 1.5])
+    array([[0.1418, 0.2007, 0.0255, 0.2575, 0.0929, 0.2272, 0.0544],
+           [0.3041, 0.109 , 0.2561, 0.2458, 0.3001, 0.0333, 0.2516]])
+
+    >>> utils.random_weights(size=(2, 7), sumto=[1., 1.5]).sum(axis=1)
+    array([1. , 1.5])
+
+    # Convert Pandas offset alises to periods per year.
+    >>> from pyfinance import utils
+
+    >>> utils.convertfreq('M')
+    12.0
+    >>> utils.convertfreq('BQS-DEC')
+    4.0
 
 ---
 API

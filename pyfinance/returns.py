@@ -39,6 +39,8 @@ import pandas as pd
 
 from pyfinance import ols, utils
 
+SECS_PER_CAL_YEAR = 365.25 * 24 * 60 * 60
+
 
 class TSeries(pd.Series):
     # __doc__ is set after class definition.
@@ -97,18 +99,41 @@ class TSeries(pd.Series):
 
         return self.CAPM(benchmark, **kwargs).alpha
 
-    def anlzd_ret(self):
+    def anlzd_ret(self, freq=None):
         """Annualized (geometric) return.
+
+        Parameters
+        ----------
+        freq : str or None, default None
+            A frequency string used to create an annualization factor.
+            If None, `self.freq` will be used.  If that is also None,
+            a frequency will be inferred.  If none can be inferred,
+            an exception is raised.
+
+            It may be any frequency string or anchored offset string
+            recognized by Pandas, such as 'D', '5D', 'Q', 'Q-DEC', or
+            'BQS-APR'.
 
         Returns
         -------
         float
         """
 
-        start = self.index[0] - 1
-        end = self.index[-1]
-        td = end - start
-        n = (td.days - 1.) / 365.
+        if self.index.is_all_dates:
+            # TODO: Could be more granular here,
+            #       for cases with < day frequency.
+            td = self.index[-1] - self.index[0]
+            n = td.total_seconds() / SECS_PER_CAL_YEAR
+        else:
+            # We don't have a datetime-like Index, so assume
+            # periods/dates are consecutive and simply count them.
+            # We do, however, need an explicit frequency.
+            freq = freq if freq is not None else self.freq
+            if freq is None:
+                raise FrequencyError('Must specify a `freq` when a'
+                                     ' datetime-like index is not used.')
+
+            n = len(self) / utils.get_anlz_factor(freq)
         return nanprod(self.ret_rels()) ** (1. / n) - 1.
 
     def anlzd_stdev(self, ddof=0, freq=None, **kwargs):
@@ -118,6 +143,15 @@ class TSeries(pd.Series):
         ----------
         ddof : int, default 0
             Degrees of freedom, passed to pd.Series.std().
+        freq : str or None, default None
+            A frequency string used to create an annualization factor.
+            If None, `self.freq` will be used.  If that is also None,
+            a frequency will be inferred.  If none can be inferred,
+            an exception is raised.
+
+            It may be any frequency string or anchored offset string
+            recognized by Pandas, such as 'D', '5D', 'Q', 'Q-DEC', or
+            'BQS-APR'.
         **kwargs
             Passed to pd.Series.std().
         TODO: freq
@@ -810,6 +844,15 @@ class TSeries(pd.Series):
             annualized, return.
         ddof : int, default 0
             Degrees of freedom, passed to pd.Series.std().
+        freq : str or None, default None
+            A frequency string used to create an annualization factor.
+            If None, `self.freq` will be used.  If that is also None,
+            a frequency will be inferred.  If none can be inferred,
+            an exception is raised.
+
+            It may be any frequency string or anchored offset string
+            recognized by Pandas, such as 'D', '5D', 'Q', 'Q-DEC', or
+            'BQS-APR'.
 
         Returns
         -------
@@ -854,7 +897,7 @@ class TSeries(pd.Series):
         stdev = self.anlzd_stdev(ddof=ddof)
         return (self.anlzd_ret() - rf) / stdev
 
-    def sortino_ratio(self, threshold=0., ddof=0):
+    def sortino_ratio(self, threshold=0., ddof=0, freq=None):
         """Return over a threshold per unit of downside deviation.
 
         A performance appraisal ratio that replaces standard deviation
@@ -866,15 +909,26 @@ class TSeries(pd.Series):
         threshold : {float, TSeries, pd.Series}, default 0.
             While zero is the default, it is also customary to use
             a "minimum acceptable return" (MAR) or a risk-free rate.
+            Note: this is assumed to be a *periodic*, not necessarily
+            annualized, return.
         ddof : int, default 0
             Degrees of freedom, passed to pd.Series.std().
+        freq : str or None, default None
+            A frequency string used to create an annualization factor.
+            If None, `self.freq` will be used.  If that is also None,
+            a frequency will be inferred.  If none can be inferred,
+            an exception is raised.
+
+            It may be any frequency string or anchored offset string
+            recognized by Pandas, such as 'D', '5D', 'Q', 'Q-DEC', or
+            'BQS-APR'.
 
         Returns
         -------
         float
         """
 
-        stdev = self.semi_stdev(threshold=threshold, ddof=ddof)
+        stdev = self.semi_stdev(threshold=threshold, ddof=ddof, freq=freq)
         return (self.anlzd_ret() - threshold) / stdev
 
     def tracking_error(self, benchmark, ddof=0):
@@ -1135,7 +1189,9 @@ class TSeries(pd.Series):
                 raise FrequencyError('No frequency was passed at'
                                      ' instantiation, and one cannot'
                                      ' be inferred.')
-        freq = utils.get_anlz_factor(freq)
+            freq = utils.get_anlz_factor(freq)
+        else:
+            freq = utils.get_anlz_factor(self.freq)
         return freq
 
 
@@ -1190,6 +1246,7 @@ Parameters
 ----------
 freq : str or None, default None
     `freq` may be passed by *keyword-argument only*.
+
 
 Methods
 -------

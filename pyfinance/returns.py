@@ -436,13 +436,10 @@ freq : str or None, default None
 
 Methods
 -------
-alpha : CAPM alpha.
-    Definition: "The return on an asset in excess of the asset's
-    required rate of return; the risk-adjusted return."
-    Source: CFA Institute
 ret_rels : Return-relatives.
     A growth factor which is simply `1 + self`, elementwise.
     This method exists purely for naming purposes.
+TODO
 
 Examples
 --------
@@ -452,9 +449,9 @@ Examples
 TSeries.__doc__ = doc.format(securities='a single security',
                              obj='Series',
                              name='TSeries',
-                             examples='')
+                             examples='TODO')
 
 TFrame.__doc__ = doc.format(securities='multiple securities',
                             obj='DataFrame',
                             name='TFrame',
-                            examples='')
+                            examples='TODO')

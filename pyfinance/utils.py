@@ -29,8 +29,6 @@ flatten
     Flatten a nested iterable.  Returns a generator object.
 isiterable
     Test whether `obj` is iterable.
-pickle_option
-    Decorator lending the option to pickle expensive functions to/from.
 public_dir
     List of attributes except those starting with specified underscores.
 random_tickers
@@ -49,14 +47,14 @@ __all__ = [
     'constrain_horizon', 'dropcols', 'encode', 'equal_weights',
     'expanding_stdize', 'isiterable', 'public_dir',
     'random_tickers', 'random_weights', 'rolling_windows', 'view',
-    'unique_everseen', 'uniqify'
+    'unique_everseen', 'uniqify',
+    'DAYS', 'MONTHS', 'WEEKOFFSETS', 'QTROFFSETS', 'ANNOFFSETS',
+    'FREQS', 'FREQMAP'
     ]
 
 from collections import Callable
-from functools import wraps
 import inspect
 import itertools
-import pickle
 import random
 import re
 import string
@@ -136,6 +134,23 @@ def can_broadcast(*args):
         return False
 
 
+DAYS = ('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')
+MONTHS = ('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP',
+          'OCT', 'NOV', 'DEC')
+
+WEEKOFFSETS = ('W-%s' % d for d in DAYS)
+QTROFFSETS = (['%s-%s' % (i, m) for m in MONTHS] for i in
+              ('Q', 'QS', 'BQ', 'BQS'))
+ANNOFFSETS = (['%s-%s' % (i, m) for m in MONTHS] for i in
+              ('A', 'AS', 'BA', 'BAS'))
+
+from_iter = itertools.chain.from_iterable
+FREQS = {'D': 252., 'W': 52., 'M': 12., 'Q': 4., 'A': 1.}
+FREQS.update(zip(WEEKOFFSETS, [52.] * 48))
+FREQS.update(zip(from_iter(QTROFFSETS), [4.] * 48))
+FREQS.update(zip(from_iter(ANNOFFSETS), [1.] * 48))
+
+
 def convertfreq(freq):
     """Convert string frequency to periods per year.
 
@@ -161,23 +176,38 @@ def convertfreq(freq):
     """
 
     freq = freq.upper()
+    return FREQS.get(freq)
 
-    days = ('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')
-    months = ('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP',
-              'OCT', 'NOV', 'DEC')
 
-    weekoffsets = ('W-%s' % d for d in days)
-    qtroffsets = (['%s-%s' % (i, m) for m in months] for i in
-                  ('Q', 'QS', 'BQ', 'BQS'))
-    annoffsets = (['%s-%s' % (i, m) for m in months] for i in
-                  ('A', 'AS', 'BA', 'BAS'))
+# TODO: business-day
+FREQMAP = {}
+for k in FREQS:
+    if k.startswith(('M', 'W', 'Q', 'A', 'D')):
+        FREQMAP[k] = k[0]
+    elif k.startswith('B'):
+        # BAS-OCT, BQ-SEP, etc.
+        FREQMAP[k] = k[1]
 
-    from_iter = itertools.chain.from_iterable
-    freqs = {'D': 252., 'W': 52., 'M': 12., 'Q': 4., 'A': 1.}
-    freqs.update(zip(weekoffsets, [52.] * 48))
-    freqs.update(zip(from_iter(qtroffsets), [4.] * 48))
-    freqs.update(zip(from_iter(annoffsets), [1.] * 48))
-    return freqs.get(freq)
+
+def mapfreq(offset):
+    """Convert 'full' offset string to its base.
+
+    Parameters
+    ----------
+    freq : str
+        May be one of ('D', 'W', 'M', 'Q', 'A') or any of Pandas
+        *anchored offset alises*, such as 'W-FRI'.  Case-insensitive.
+
+    Returns
+    -------
+    str : {'D', 'W', 'M', 'Q', 'A'}
+
+    .. _Pandas Offset Aliases:
+        pandas.pydata.org/pandas-docs/stable/timeseries.html#anchored-offsets
+    """
+
+    offset = offset.upper()
+    return FREQMAP.get(offset)
 
 
 def constrain(*objs):
@@ -310,6 +340,32 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
         raise ValueError('`start` pre-dates first element of the Index, %s'
                          % r.index[0])
     return r[start:end]
+
+
+def cumargmax(a):
+    """Cumulative argmax.
+
+    Parameters
+    ----------
+    a : np.ndarray
+
+    Returns
+    -------
+    np.ndarray
+    """
+
+    # Thank you @Alex Riley
+    # https://stackoverflow.com/a/40675969/7954504
+
+    m = np.asarray(np.maximum.accumulate(a))
+    if a.ndim == 1:
+        x = np.arange(a.shape[0])
+    else:
+        x = np.repeat(np.arange(a.shape[0])[:, None], a.shape[1], axis=1)
+
+    x[1:] *= m[:-1] < m[1:]
+    np.maximum.accumulate(x, axis=0, out=x)
+    return x
 
 
 def dropcols(df, start=None, end=None):
@@ -471,32 +527,6 @@ def isiterable(obj):
         return True
     except AttributeError:
         return False
-
-
-def pickle_option(func):
-    sig = inspect.signature(func)
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        bound_args = sig.bind(*args, **kwargs)
-        pickle_from = bound_args.arguments.get(
-            'pickle_from', sig.parameters['pickle_from'].default)
-        pickle_to = bound_args.arguments.get(
-            'pickle_to', sig.parameters['pickle_to'].default)
-
-        if pickle_from:
-            with open(pickle_from + '.pickle', 'rb') as f:
-                result = pickle.load(f)
-        else:
-            result = func(*args, **kwargs)
-
-        if pickle_to:
-            with open(pickle_to + '.pickle', 'wb') as f:
-                pickle.dump(result, f)
-
-        return result
-
-    return wrapper
 
 
 def public_dir(obj, max_underscores=0, type_=None):

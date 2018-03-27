@@ -41,85 +41,56 @@ __all__ = ['TSeries', 'TFrame']
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 
 import copy
-import functools
+from numbers import Number
 
 import numpy as np
 import pandas as pd
+from pandas import tseries
 
-from pyfinance import utils
-
-
-# TODO: fmt
+from pyfinance import ols, utils
 
 
 class TSeries(pd.Series):
-    """A time series of periodic returns for a sinngle security.
-
-    Subclass of pandas.Series.
-
-    Parameters
-    ----------
-    freq : str or None, default None
-        Optionally, explicitly specify an Index frequency as str; for
-        example, 'M' denotes monthly frequency.
-
-        Hierarchy:
-        - If `freq` is specified, it overrides the frequency of the
-        input Index.
-        - If None and the input Index has a frequency, use that.
-        - If None and the input Index has no frequency, attempt to
-        infer one.
-        - If all the above fails, `self.freq` is None.
-
-    fmt : {'dec', 'num'}
-        The "format" (representation) of the input returns.
-        'dec' means that 0.05 represents a 5% return.
-        'num' means that 5.00 represents a 5% return.
-        The same hierarchy applies for `fmt` as does for `freq`.
-
-    Note that **instance methods always return 'dec' format.**
-    """
-
-    # Normal properties; these will be passed to manipulation results.
-    _metadata = ['freq', 'fmt']
+    # __doc__ is set after class definition.
+    # See bottom of this file or `help(TSeries)`.
 
     def __init__(self, *args, **kwargs):
-        # Copy because we would otherwise inadvertantly alter
-        # mutable arguments suc as Series, _Returns, lists.
-        args = [copy.deepcopy(arg) for arg in args]
+        args = tuple(copy.deepcopy(arg) for arg in args)
         freq = kwargs.pop('freq', None)
-        fmt = kwargs.pop('fmt', 'dec')
         super().__init__(*args, **kwargs)
 
-        # Deal with cases where a Series or TSeries is passed;
-        # we want to (try) to take on its `freq` and `fmt`.
-        data = args[0]
-        is_series_like = isinstance(data, (TSeries, pd.Series))
-        if not is_series_like:
-            self.freq = freq
-            self.fmt = fmt
+        if freq is None:
+            if hasattr(self.index, 'freq'):
+                if self.index.freq is not None:
+                    self.freq = self.index.freqstr
+                else:
+                    freq = pd.infer_freq(self.index)
+                    if freq is None:
+                        data = args[0]
+                        if isinstance(data, TSeries):
+                            freq = data.freq
+                            if freq is None:
+                                err = ('A frequency (`freq`) was not passed',
+                                       ' and cannot be inferred from the',
+                                       ' resulting Index.')
+                                raise FrequencyError(err)
+                    else:
+                        self.freq = freq
+                        self.index.freq = tseries.frequencies.to_offset(freq)
+            else:
+                # We're SOL.
+                raise FrequencyError('A frequency (`freq`) was not passed, and'
+                                     ' the resulting Index is not'
+                                     ' datetime-like.')
         else:
-            # TODO: just take on `data`'s `freq` and return None
-            # Tested that we aren't mutating a view here.
-            _add_freq(self.index, inplace=True)
-            # Now, we need to extract `fmt` and `freq` (str) from this.
-            if self.index.freq:
-                self.freq = self.index.freq.freqstr
+            # The passed parameter takes priority.
+            # But, still make sure we're working with a valid index.
+            self.freq = freq
+            if hasattr(self.index, 'freq'):
+                self.index.freq = pd.tseries.frequencies.to_offset(freq)
             else:
-                # `self.index.freq` is None
-                self.freq = freq
-            # If we're passed a Tseries, also attempt to grab its `fmt`.
-            if isinstance(data, TSeries):
-                self.fmt = data.fmt
-            else:
-                self.fmt = fmt
-
-        # Make a final pass at getting str attributes.
-        # This covers cases where the frequency is derived from
-        # the index passed to Series(), i.e.
-        # r = TSeries(s, index=pd.date_range('2017', periods=20, freq='M'))
-        if self.index.freq and not self.freq:
-            self.freq = self.index.freq.freqstr
+                raise FrequencyError('The resulting Index must be'
+                                     ' datetime-like.')
 
     @property
     def _constructor(self):
@@ -129,224 +100,92 @@ class TSeries(pd.Series):
     def _constructor_expanddim(self):
         return TFrame
 
-    # We don't need _constructor_sliced; it raises NotImplementedError
-    # by default.
+    # We don't need _constructor_sliced.
+    # It raises NotImplementedError by default.
 
     # "New" public methods
     # -----------------------------------------------------------------
 
-    def ret_rels(self):
-        """Return-relatives, 1 + r.
+    # Prefer operators to their corresponding Pandas methods
+    # so that we can handle NumPy arrays within transformations.
+    # "/" is better than x.div(y).
 
-        Returns
-        -------
-        TSeries
-        """
-
-        return self.add(1.)
-
-    def ret_idx(self, base=1.0):
-        """Return index with starting value of `base`.
-
-        Returns
-        -------
-        TSeries
-        """
-
-        return self.ret_rels().cumprod().mul(base)
-
-    def cum_ret_idx(self):
-        """Cumulative return index; equal to `self.ret_idx() - 1.
-
-        Returns
-        -------
-        TSeries
-        """
-
-        return self.ret_idx().sub(1.)
-
-    def growth_of_x(self, x=1.0):
-        """Growth of a starting amount of `x`.
-
-        Returns
-        -------
-        float
-        """
-
-        prod = self.ret_rels().prod() * x
-        assert prod > 0, 'TODO'
-        return prod
-
-    def cum_ret(self):
-        """Cumulative return.
-
-        Returns
-        -------
-        float
-        """
-
-        return self.growth_of_x() - 1.
-
-    def geomean(self):
-        """Geometric mean return, a scalar.
-
-        Returns
-        -------
-        float
-        """
-
-        return self.ret_rels().prod() ** (1. / self.count()) - 1.
+    def alpha(self, benchmark, **kwargs):
+        return self.CAPM(benchmark, **kwargs).alpha
 
     def anlzd_ret(self):
-        """Annualized return.
-
-        Returns
-        -------
-        float
-        """
-
         start = self.index[0] - 1
         end = self.index[-1]
         td = end - start
         n = (td.days - 1.) / 365.
         return self.ret_rels().prod() ** (1. / n) - 1.
 
-    def drawdown_idx(self):
-        """Percentage drawdown from the cumulative high.
+    def anlzd_stdev(self, ddof=0):
+        return self.std(ddof=ddof) * utils.convertfreq(self.freq) ** 0.5
 
-        Returns
-        -------
-        TSeries
+    def batting_avg(self, benchmark):
+        diff = self.excess_ret(benchmark)
+        return np.count_nonzero(diff > 0.) / diff.count()
+
+    def beta(self, benchmark, **kwargs):
+        return self.CAPM(benchmark, **kwargs).beta
+
+    def beta_adj(self, benchmark, adj_factor=2/3, **kwargs):
+        """
+        .. _Blume, Marshall.  "Betas and Their Regression Tendencies."
+            http://www.stat.ucla.edu/~nchristo/statistics417/blume_betas.pdf
         """
 
-        ri = self.ret_idx()
-        return ri.div(ri.cummax()).sub(1.)
+        beta = self.beta(benchmark=benchmark, **kwargs)
+        return adj_factor * beta + (1 - adj_factor)
 
-    def max_drawdown(self):
-        """Maximum drawdown.
+    def calmar_ratio(self):
+        return self.anlzd_ret() / np.abs(self.max_drawdown())
 
-        Returns
-        -------
-        float
-        """
+    def capture_ratio(self, benchmark, threshold=0., compare_op=('ge', 'lt')):
+        if isinstance(compare_op(tuple, list)):
+            op1, op2 = compare_op
+        else:
+            op1, op2 = compare_op, compare_op
+        uc = self.up_capture(benchmark=benchmark, threshold=threshold,
+                             compare_op=op1)
+        dc = self.down_capture(benchmark=benchmark, threshold=threshold,
+                               compare_op=op2)
+        return uc / dc
 
-        return self.drawdown_idx().min()
+    def cuml_ret(self):
+        self.growth_of_x() - 1.
 
-    def anlzd_std(self, ddof=0):
-        """Annualized standard deviation with `ddof` degrees of freedom.
+    def cuml_idx(self):
+        self.ret_idx() - 1.
 
-        Parameters
-        ----------
-        ddof : int, default 0
-            Degrees of freedom.  Passed to `self.std()`
-        """
+    def down_capture(self, benchmark, threshold=0., compare_op='lt'):
+        # NOTE: Uses geometric return.
+        slf, bm = self.downmarket_filter(benchmark=benchmark,
+                                         threshold=threshold,
+                                         compare_op=compare_op,
+                                         include_benchmark=True)
+        return slf.geomean() / bm.geomean()
 
-        n = utils.convertfreq(self.freq)
-        return self.std(ddof=ddof) * np.sqrt(n)
-
-    def rollup(self, freq):
-        """Downsample returns through geometric linking.
-
-        Returns
-        -------
-        TSeries
-        """
-
-        # TODO: this may switch to an alias, something like
-        # self.freq = 'Q-DEC'.
-        return TSeries(self.resample(freq).apply(lambda f: f.cum_ret()),
-                       freq=freq, fmt=self.fmt)
-
-
-class TFrame(pd.DataFrame):
-    _metadata = ['freq', 'fmt']
-
-    def __init__(self, *args, **kwargs):
-        freq = kwargs.pop('freq', None)
-        fmt = kwargs.pop('fmt', 'dec')
-        args = [copy.deepcopy(arg) for arg in args]
-        super().__init__(*args, **kwargs)
-        if len(args) == 1 and isinstance(args[0], TFrame):
-            args[0]._copy_attrs(self)
-        self.freq = freq
-        self.fmt = fmt
-        if self.fmt == 'num':
-            self[:] = self[:] * .01
-        self.index = _add_freq(self, self.freq)
-
-    # TODO: self.freq could be None here (still) even if index hasfreq
-
-    def _copy_attrs(self, obj):
-        for attr in self._metadata:
-            obj.__dict__[attr] = getattr(self, attr, None)
-
-    @property
-    def _constructor(self):
-        # Used when a manipulation result has the same dimesions
-        # as the original.
-        def f(*args, **kwargs):
-            obj = TFrame(*args, **kwargs)
-            self._copy_attrs(obj)
-            return obj
-        return f
-
-    @property
-    def _constructor_sliced(self):
-        # Used when a manipulation result has one lower dimension(s)
-        # as the original, such as DataFrame single columns slicing.
-        return TSeries
-
-    # New methods
-    # -----------------------------------------------------------------
-
-    def ret_rels(self):
-        """Return-relatives, 1+r."""
-        return self.add(1.)
-
-    def ret_idx(self, base=1.0):
-        """Return index with starting value of `base`."""
-        return self.ret_rels().cumprod(axis=0).mul(base)
-
-    def cum_ret_idx(self):
-        """Cumulative return index."""
-        return self.ret_idx().sub(1.)
-
-    def cum_ret(self):
-        """Cumulative return, a scalar for each security."""
-        return self.ret_rels().prod().sub(1.)
-
-    def geomean(self):
-        """Geometric mean return, a scalar for each security."""
-        return self.ret_rels().prod().pow(1./self.count()).sub(1.)
-
-    def anlzd_ret(self):
-        """Annualized return."""
-        start = self.index[0] - 1
-        end = self.index[-1]
-        td = end - start
-        n = (td.days - 1) / 365.
-        return self.ret_rels().prod().pow(1./n).sub(1.)
-
-    def drawdown_idx(self):
-        """Drawdown index."""
-        ri = self.ret_idx()
-        return ri.div(ri.cummax()).sub(1.)
-
-    def max_drawdown(self):
-        """Maximum drawdown."""
-        return self.drawdown_idx().min()
-
-    def anlzd_std(self, ddof=0):
-        n = utils.convertfreq(self.index.freq.freqstr)
-        return self.std(ddof=ddof).mul(np.sqrt(n))
-
-    def rollup(self, freq):
-        """Downsample returns through geometric linking."""
-        return self.resample(freq).apply(lambda f: TFrame(f).cum_ret())
+    def downmarket_filter(self, benchmark, threshold=0., compare_op='lt',
+                          include_benchmark=False):
+        return self._mkt_filter(benchmark=benchmark, threshold=threshold,
+                                compare_op=compare_op,
+                                include_benchmark=include_benchmark)
 
     def drawdown_end(self):
-        """The trough date at which drawdown was most negative."""
+        # TODO: call .date(), but how would this work for arrays?
         return self.drawdown_idx().idxmin()
+
+    def drawdown_idx(self):
+        ri = self.ret_idx()
+        return ri / np.maximum(ri.cummax(), 1.) - 1.
+
+    def drawdown_length(self):
+        return self.drawdown_end() - self.drawdown_start()
+
+    def drawdown_recov(self):
+        return self.recov_date() - self.drawdown_end()
 
     def drawdown_start(self):
         # From: @cᴏʟᴅsᴘᴇᴇᴅ
@@ -354,8 +193,97 @@ class TFrame(pd.DataFrame):
         mask = (dd == dd.min()).cumsum().astype(bool)
         return dd.mask(mask)[::-1].idxmax()
 
+    def excess_drawdown_idx(self, benchmark, method='caer'):
+        """
+        Parameters
+        ----------
+        method : {'caer' (0), 'cger' (1), 'ecr' (2), 'ecrr' (3)}
+        """
+
+        # TODO: plot these (compared) in docs
+
+        if isinstance(method, (int, float)):
+            method = ['caer', 'cger', 'ecr', 'ecrr'][method]
+        method = method.lower()
+
+        if method == 'caer':
+            er = self.excess_ret(benchmark=benchmark, method='arithmetic')
+            return er.drawdown_idx()
+
+        elif method == 'cger':
+            er = self.excess_ret(benchmark=benchmark, method='geometric')
+            return er.drawdown_idx()
+
+        elif method == 'ecr':
+            er = self.ret_idx() - benchmark.ret_idx() + 1
+            return er / np.maximum.accumulate(er) - 1.
+
+        elif method == 'ecrr':
+            # Credit to: SO @piRSquared
+            # https://stackoverflow.com/a/36848867/7954504
+            p = self.ret_idx()
+            b = benchmark.ret_idx()
+            er = p - b
+            cam = utils.cumargmax(er)
+            p0 = p.values[cam]
+            b0 = b.values[cam]
+            return (p * b0 - b * p0) / (p0 * b0)
+
+        else:
+            raise ValueError("`method` must be one of"
+                             " ('caer', 'cger', 'ecr', 'ecrr'),"
+                             " case-insensitive, or"
+                             " an integer mapping to these methods"
+                             " (1 thru 4).")
+
+    def excess_ret(self, benchmark, method='arithmetic'):
+        """
+        .. _Essex River Analytics - A Case for Arithmetic Attribution
+            http://www.northinfo.com/documents/563.pdf
+
+        .. _Bacon, Carl.  Excess Returns - Arithmetic or Geometric?
+            https://www.cfapubs.org/doi/full/10.2469/dig.v33.n1.1235
+        """
+
+        if method.startswith('arith'):
+            return self - _try_to_squeeze(benchmark)
+        elif method.startswith('geo'):
+            # Geometric excess return,
+            # (1 + `self`) / (1 + `benchmark`) - 1.
+            return self.ret_rels() / _try_to_squeeze(benchmark).ret_rels() - 1.
+
+    def gain_to_loss_ratio(self):
+        gt = self > 0
+        lt = self < 0
+        return (np.sum(gt) / np.sum(lt)) * (self[gt].mean() / self[lt].mean())
+
+    def geomean(self):
+        self.ret_rels().prod() ** (1. / self.count()) - 1.
+
+    def growth_of_x(self, x=1.0):
+        return self.ret_rels().prod() * x
+
+    def info_ratio(self, benchmark, ddof=0):
+        # TODO: arithmetic mean versus geomean
+        diff = self.anlzd_ret() - benchmark.anlzd_ret()
+        return diff / self.tracking_error(benchmark, ddof=ddof)
+
+    def max_drawdown(self):
+        return self.drawdown_idx().min()
+
+    def msquared(self, benchmark, rf=0.02, ddof=0):
+        rf = self._validate_rf(rf)
+        scaling = benchmark.anlzd_stdev(ddof) / self.anlzd_stdev(ddof)
+        diff = self.anlzd_ret() - rf
+        return rf + diff * scaling
+
+    def pct_negative(self, threshold=0.0):
+        return self[self < threshold].count() / self.count()
+
+    def pct_positive(self, threshold=0.0):
+        return self[self > threshold].count() / self.count()
+
     def recov_date(self):
-        """Date after drawdown trough at which previous HWM reached."""
         dd = self.drawdown_idx()
         mask = (dd != dd.min()).cumprod().astype(bool)
         res = dd.mask(mask).eq(0.).idxmax()
@@ -363,208 +291,126 @@ class TFrame(pd.DataFrame):
         # If all values are False (recovery has not occured),
         #     we need a 2nd mask or else recov date will be
         #     incorrectly recognized as index[0].
-        # See `idxmax` docs.
-        newmask = res.eq(self.index[0])
+        # See `idxmax()` docs.
+        newmask = res == self.index[0]
         return res.mask(newmask)
 
-    def drawdown_length(self):
-        """Peak to trough length."""
-        return self.drawdown_end().sub(self.drawdown_start())
+    def ret_idx(self, base=1.):
+        return self.ret_rels().cumprod() * base
 
-    def drawdown_recov(self):
-        """Period length of recovery from drawdown trough."""
-        return self.recov_date().sub(self.drawdown_end())
+    def ret_rels(self):
+        return self + 1.
 
-    def _mkt_filter(self, benchmark, threshold, op, incl_bm=False):
-        # Note: this drops; it is *not* an NaN mask
-        benchmark = _try_to_squeeze(benchmark)
-        if not isinstance(benchmark, (TFrame, TSeries)):
-            raise ValueError
-        op = getattr(benchmark, op)
-        mask = op(threshold).values
-        if not incl_bm:
-            return self.loc[mask]
-        else:
-            return (self.loc[mask], benchmark.loc[mask])
+    def rollup(self, freq, **kwargs):
+        self.ret_rels().resample(freq, **kwargs).prod() - 1.
 
-    def upmkt_filter(self, benchmark, threshold=0.0, op='ge', incl_bm=False):
-        return self._mkt_filter(benchmark=benchmark, threshold=threshold,
-                                op=op, incl_bm=incl_bm)
+    def rsq(self, benchmark, **kwargs):
+        return self.CAPM(benchmark, **kwargs).rsq
 
-    def downmkt_filter(self, benchmark, threshold=0.0, op='le', incl_bm=False):
-        return self._mkt_filter(benchmark=benchmark, threshold=threshold,
-                                op=op, incl_bm=incl_bm)
+    def rsq_adj(self, benchmark, **kwargs):
+        return self.CAPM(benchmark, **kwargs).rsq_adj
 
-    def pct_positive(self, threshold=0.0):
-        return self[self.gt(threshold)].count().div(self.count())
-
-    def pct_negative(self, threshold=0.0):
-        return self[self.lt(threshold)].count().div(self.count())
-
-    def excess_ret(self, benchmark):
-        benchmark = _try_to_squeeze(benchmark)
-        return self.sub(benchmark, axis=0)
-
-    def tracking_err(self, benchmark, ddof=0):
-        er = self.excess_ret(benchmark=benchmark)
-        return er.anlzd_std(ddof=ddof)
-
-    def up_capture(self, benchmark, threshold=0.0, op='ge'):
-        """Uses anlzd (geometric) return."""
-        slf, bm = self.upmkt_filter(benchmark=benchmark, threshold=threshold,
-                                    op=op, incl_bm=True)
-        # bm is now `_Returns`
-        return slf.geomean().div(bm.geomean())
-
-    def down_capture(self, benchmark, threshold=0.0, op='ge'):
-        """Uses anlzd (geometric) return."""
-        slf, bm = self.downmkt_filter(benchmark=benchmark, threshold=threshold,
-                                      op=op, incl_bm=True)
-        return slf.geomean().div(bm.geomean())
-
-    def capture_ratio(self, benchmark, threshold=0.0):
-        uc = self.up_capture(benchmark=benchmark, threshold=threshold, op='ge')
-        dc = self.down_capture(benchmark=benchmark, threshold=threshold,
-                               op='ge')
-        return uc.div(dc)
-
-    @functools.lru_cache(maxsize=None)
-    def _get_rf(self):
-        from pyfinance import datasets  # noqa
-        # TODO: careful with self.freq, could be None
-        # TODO: load_rf calls `rollup`, circularity
-        rf = _try_to_squeeze(TFrame(datasets.load_rf(freq=self.freq).dropna()))
-        return rf
-
-    def sharpe(self, ddof=0):
-        """Sharpe ratio."""
-        return self.anlzd_ret().sub(self._get_rf())\
-            .div(self.anlzd_std(ddof=ddof))
-
-    def calmar(self):
-        """Calmar ratio."""
-        return self.anlzd_ret() / self.max_drawdown().abs()
-
-    def batting_avg(self, benchmark, window, **kwargs):
-        """Outperformed in `x` pct. of rolling periods."""
-        slf = self.ret_rels().rolling(window=window, **kwargs).\
-            apply(np.prod).dropna()
-        bm = benchmark.ret_rels().rolling(window=window, **kwargs).\
-            apply(np.prod).dropna()
-        return slf.gt(bm, axis=0).sum() / slf.count()
-
-    # Incomplete
-    # -----------------------------------------------------------------
-
-    def excess_drawdown_idx(self, benchmark, **kwargs):
-        raise NotImplementedError
-
-    def sortino(self, threshold=0.0, ddof=0):
-        raise NotImplementedError
-        std = self.semi_std(threshold=threshold, ddof=ddof)
-        return self.anlzd_ret().sub(threshold).div(std)
-
-    def semi_std(self, threshold=0.0, ddof=0):
+    def semi_stdev(self, threshold=0., ddof=0):
+        # TODO: see old docs
+        # TODO: de-annualize `threshold`
         # sqrt( sum([min(r_i - thresh, 0] **2 ) / (n - ddof) )
-        # TODO: thresh is *not* assumed to be anlzd here
-        # TODO: anlz this stdev
-        raise NotImplementedError
-        return self.sub(threshold).clip_lower(0.).pow(2.).sum()\
-            .div(self.count().sub(ddof)).pow(0.5)
+
+        n = self.count() - ddof
+        ss = (np.sum(np.minimum(self - threshold, 0.) ** 2) ** 0.5) / n
+        return ss * utils.convertfreq(self.freq) ** 0.5
+
+    def sharpe_ratio(self, rf=0.02, ddof=0):
+        rf = self._validate_rf(rf)
+        stdev = self.anlzd_std(ddof=ddof)
+        return (self.anlzd_ret() - rf) / stdev
+
+    def sortino_ratio(self, threshold=0., ddof=0):
+        stdev = self.semi_stdev(threshold=threshold, ddof=ddof)
+        return (self.anlzd_ret() - threshold) / stdev
+
+    def tracking_error(self, benchmark, ddof=0):
+        er = self.excess_ret(benchmark=benchmark)
+        return er.anlzd_stdev(ddof=ddof)
+
+    def treynor_ratio(self):
+        raise NotImplementedError('ols (and rf)')
+
+    def tstat_alpha(self, benchmark, **kwargs):
+        return self.CAPM(benchmark, **kwargs).tstat_alpha
+
+    def tstat_beta(self, benchmark, **kwargs):
+        return self.CAPM(benchmark, **kwargs).tstat_beta
 
     def ulcer_idx(self):
-        raise NotImplementedError
+        return np.mean(self.drawdown_idx() ** 2) ** 0.5
 
-    def msquared(self):
-        raise NotImplementedError
+    def up_capture(self, benchmark, threshold=0., compare_op='ge'):
+        # NOTE: Uses geometric return.
+        slf, bm = self.upmarket_filter(benchmark=benchmark,
+                                       threshold=threshold,
+                                       compare_op=compare_op,
+                                       include_benchmark=True)
+        return slf.geomean() / bm.geomean()
 
-    def rolling_factory(self, **kwargs):
-        # Just some braintorming...
-        # Would we need to convert each subframe to Returns?
-        # Keep in mind a rolling object is different than groupby.
-        # rolling = self.rolling(**kwargs)\
-        #     .apply(lambda f: Returns(f).somemethod()) ...
-        raise NotImplementedError
+    def upmarket_filter(self, benchmark, threshold=0., compare_op='ge',
+                        include_benchmark=False):
+        return self._mkt_filter(benchmark=benchmark, threshold=threshold,
+                                compare_op=compare_op,
+                                include_benchmark=include_benchmark)
 
-    # OLS regression/factor loadings
-    # ----------------
+    def _mkt_filter(self, benchmark, threshold, compare_op,
+                    include_benchmark=False):
+        """Filter self based on `benchmark` performance in same period.
+        """
 
-    def beta(self, benchmark):
-        raise NotImplementedError
+        benchmark = _try_to_squeeze(benchmark)
+        if not isinstance(benchmark, (TFrame, TSeries)):
+            raise ValueError('`benchmark` must be TFrame or TSeries.')
+        # Use the dunder method to be NumPy-compatible.
+        compare_op = getattr(benchmark, '{0}{1}{0}'.format('__', compare_op))
+        mask = compare_op(threshold).values
+        if not include_benchmark:
+            return self.loc[mask]
+        else:
+            return self.loc[mask], benchmark.loc[mask]
 
-    def alpha(self, benchmark):
-        raise NotImplementedError
+    def _validate_rf(self, rf):
+        if not isinstance(rf, Number):
+            if isinstance(rf, np.ndarray):
+                if len(rf) != len(self):
+                    raise ValueError('When passed as a NumPy array,'
+                                     '`rf` must be of equal length'
+                                     ' as `self`. to enable alignment.')
+                    rf = TSeries(rf, freq=self.freq)
+            else:
+                rf = rf.reindex(self.index)
+                if isinstance(rf, pd.Series):
+                    rf = TSeries(rf, freq=self.freq)
+                rf = rf.anlzd_ret()
+        return rf
 
-    def tstat_beta(self, benchmark):
-        raise NotImplementedError
-
-    def tstat_alpha(self, benchmark):
-        raise NotImplementedError
-
-    def rsq(self, benchmark):
-        raise NotImplementedError
-
-    def rsq_adj(self, benchmark):
-        raise NotImplementedError
-
-
-def _add_freq(idx, freq=None, inplace=False):
-    """Ensure Index of the DataFrame or Series has a frequency.
-
-    We can't do many time-aware calculations within a valid Index freq.
-
-    Rule hierarchy:
-    1. If `idx` is not a DatetimeIndex or PeriodIndex, return it unchanged.
-    2. If `idx` already has a frequency, do nothing.
-    3. If a frequency is explicitly passed, use it.
-    4. If no frequency is passed, attempt to infer.
-    5. If (2) and (3) fail, raise.
-
-    Parameters
-    ----------
-    idx : pd.Index-like
-    freq : str
-    inplace : bool
-        If True, modify `idx` inplace and return None.  Otherwise,
-        return modified copy.
-
-    Example
-    -------
-    >>> import pandas as pd
-    >>> idx = pd.Index([pd.datetime(2000, 1, 2),
-                        pd.datetime(2000, 1, 3),
-                        pd.datetime(2000, 1, 4)])
-    >>> idx.freq is None
-    True
-    >>> _add_freq(idx).freq
-    <Day>
-    >>> type(_add_freq(idx).freq)
-    pandas.tseries.offsets.Day
-    """
-
-    if not inplace:
-        idx = idx.copy()
-    if not isinstance(idx, (pd.DatetimeIndex, pd.PeriodIndex)):
-        # Nothing more we can do.
-        if not inplace:
-            return idx
-    if idx.freq is not None:
-        freq = idx.freq
-        if not inplace:
-            return idx
-    else:
-        if freq is None:
-            # First try to infer.  This will raise ValueError if fails.
-            freq = pd.infer_freq(idx)  # = str
-        # Now convert this to a Pandas offset.
-        freq = pd.tseries.frequencies.to_offset(freq)
-    idx.freq = freq
-    if not inplace:
-        return idx
+    # Unfortunately, we can't cache this result because the input
+    #     (benchmark) is mutable and not hashable.  And we don't want to
+    #     sneak around that, in the off-chance that the input actually
+    #     would be altered between calls.
+    # One alternative: specify the benchmark at instantiation,
+    #     and "bind" self to that.
+    # The nice thing is that some properties of the resulting OLS
+    #     object *are* cached, so repeated calls are pretty fast.
+    def CAPM(self, benchmark, has_const=False, use_const=True):
+        return ols.OLS(y=self, x=benchmark, has_const=has_const,
+                       use_const=use_const)
 
 
 def _try_to_squeeze(obj, raise_=False):
-    """Attempt to squeeze to 1d Series."""
+    """Attempt to squeeze to 1d Series.
+
+    Parameters
+    ----------
+    obj : {pd.Series, pd.DataFrame}
+    raise_ : bool, default False
+    """
+
     if isinstance(obj, pd.Series):
         return obj
     elif isinstance(obj, pd.DataFrame) and obj.shape[-1] == 1:
@@ -575,6 +421,56 @@ def _try_to_squeeze(obj, raise_=False):
         return obj
 
 
-def _check_fmt(obj, fmt):
-    """Make sure `fmt` makes sense based on values of `obj`."""
-    raise NotImplementedError
+class FrequencyError(ValueError):
+    """Index frequency misspecified, missing, or not inferrable."""
+    pass
+
+
+class TFrame(object):
+    def __init__(self):
+        raise NotImplementedError
+
+
+# ---------------------------------------------------------------------
+# Long-form docstring shared between TSeries & TFrame.
+
+doc = """
+Time series of periodic returns for {securities}.
+
+Subclass of `pandas.{obj}`, with an extended set of methods
+geared towards calculating common investment metrics.
+
+The main structural difference between `{name}` and a Pandas
+{obj} is that {name} *must* have a datetime-like index with a
+discernable frequency.  This is enforced strictly during
+instantiation.
+
+Parameters
+----------
+freq : str or None, default None
+    `freq` may be passed by *keyword-argument only*.
+
+Methods
+-------
+alpha : CAPM alpha.
+    Definition: "The return on an asset in excess of the asset's
+    required rate of return; the risk-adjusted return."
+    Source: CFA Institute
+ret_rels : Return-relatives.
+    A growth factor which is simply `1 + self`, elementwise.
+    This method exists purely for naming purposes.
+
+Examples
+--------
+{examples}
+"""
+
+TSeries.__doc__ = doc.format(securities='a single security',
+                             obj='Series',
+                             name='TSeries',
+                             examples='')
+
+TFrame.__doc__ = doc.format(securities='multiple securities',
+                            obj='DataFrame',
+                            name='TFrame',
+                            examples='')

@@ -26,3 +26,7 @@ Modules
 """
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
+
+
+# Echoing Pandas, bring these to top-level namespace.
+from .returns import TFrame, TSeries  # noqa

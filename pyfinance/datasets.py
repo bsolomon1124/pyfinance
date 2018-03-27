@@ -29,8 +29,6 @@ import pandas_datareader as pdr
 import requests
 import xmltodict
 
-from pyfinance import returns, utils
-
 # Default start date for web-retrieved time series.
 DSTART = '1950-01'
 
@@ -72,8 +70,7 @@ def load_13f(url):
     return df
 
 
-@utils.pickle_option
-def load_factors(pickle_from=None, pickle_to=None):
+def load_factors():
     """Load risk factor returns.
 
     Factors
@@ -277,8 +274,7 @@ def load_factors(pickle_from=None, pickle_to=None):
     return factors
 
 
-@utils.pickle_option
-def load_industries(pickle_from=None, pickle_to=None):
+def load_industries():
     """Load industry portfolio returns from Ken French's website.
 
     Returns
@@ -312,8 +308,7 @@ def load_industries(pickle_from=None, pickle_to=None):
     return industries
 
 
-@utils.pickle_option
-def load_rates(freq='D', pickle_from=None, pickle_to=None):
+def load_rates(freq='D'):
     """Load interest rates from https://fred.stlouisfed.org/.
 
     Parameters
@@ -387,7 +382,7 @@ def load_rates(freq='D', pickle_from=None, pickle_to=None):
     return rates
 
 
-def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
+def load_rf(freq='M'):
     """Build a risk-free rate return series using 3-month US T-bill yields.
 
     The 3-Month Treasury Bill: Secondary Market Rate from the Federal Reserve
@@ -398,8 +393,6 @@ def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
 
     Parameters
     ----------
-    reload : bool, default False
-        If False, use pickled data.  If True, reload from source
     freq : str, sequence, or set
         If a single-character string, return a single-column DataFrame with
         index frequency corresponding to `freq`.  If a sequence or set, return
@@ -463,26 +456,28 @@ def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
       September 2008.
     """
 
-    # Validate `freq` param
-    freqs = list('DWMQA')
-    freq = freq.upper() if freq.islower() else freq
+    freqs = 'DWMQA'
+    freq = freq.upper()
     if freq not in freqs:
         raise ValueError('`freq` must be either a single element or subset'
                          ' from %s, case-insensitive' % freqs)
 
-    # Load daily 3-Month Treasury Bill: Secondary Market Rate
-    # Note that this is on discount basis and will be converted to BEY
-    # Periodicity is daily
-    rates = pdr.DataReader('DTB3', 'fred', DSTART) * 0.01
-    rates = (rates.asfreq('D', method='ffill').fillna(method='ffill')
-                  .squeeze())
+    # Load daily 3-Month Treasury Bill: Secondary Market Rate.
+    # Note that this is on discount basis and will be converted to BEY.
+    # Periodicity is daily.
+    rates = pdr.DataReader('DTB3', 'fred', DSTART)\
+        .mul(0.01)\
+        .asfreq('D', method='ffill')\
+        .fillna(method='ffill')\
+        .squeeze()
 
     # Algebra doesn't 'work' on DateOffsets, don't simplify here!
+    minus_one_month = offsets.MonthEnd(-1)
+    plus_three_months = offsets.MonthEnd(3)
     trigger = rates.index.is_month_end
-    dtm_old = rates.index + offsets.MonthEnd(-1) + offsets.MonthEnd(3) \
-        - rates.index
-    dtm_new = rates.index.where(trigger, rates.index + offsets.MonthEnd(-1)) \
-        + offsets.MonthEnd(3) - rates.index
+    dtm_old = rates.index + minus_one_month + plus_three_months - rates.index
+    dtm_new = rates.index.where(trigger, rates.index + minus_one_month) \
+        + plus_three_months - rates.index
 
     # This does 2 things in one step:
     # (1) convert discount yield to BEY
@@ -492,18 +487,13 @@ def load_rf(freq='M', pickle_from=None, pickle_to=None, ):
     p_old = (100 / 360) * (360 - rates * dtm_old.days)
     p_new = (100 / 360) * (360 - rates * dtm_new.days)
 
-    res = p_old.pct_change().where(trigger, p_new.pct_change())
-    res = returns.prep(res, in_format='dec', name='RF', freq='D')
-
-    if freq != 'D':
-        res = returns.prep(res.rollup(out_freq=freq), in_format='dec',
-                           freq=freq)
-
-    return res
+    res = p_old.pct_change().where(trigger, p_new.pct_change()).dropna()
+    # TODO: For purpose of using in TSeries, we should drop upsampled
+    #       periods where we don't have the full period constituents.
+    return res.add(1.).resample(freq).prod().sub(1.)
 
 
-@utils.pickle_option
-def load_shiller(pickle_from=None, pickle_to=None):
+def load_shiller():
     """Load market & macroeconomic data from Robert Shiller's website.
 
     Returns
@@ -540,8 +530,7 @@ def load_shiller(pickle_from=None, pickle_to=None):
     return iedata.set_index('date')
 
 
-@utils.pickle_option
-def load_retaildata(pickle_from=None, pickle_to=None):
+def load_retaildata():
     """Monthly retail trade data from census.gov."""
     # full = 'https://www.census.gov/retail/mrts/www/mrtssales92-present.xls'
     # indiv = 'https://www.census.gov/retail/marts/www/timeseries.html'

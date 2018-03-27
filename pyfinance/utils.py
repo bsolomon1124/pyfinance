@@ -43,13 +43,11 @@ view
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 __all__ = [
-    'appender', 'avail', 'can_broadcast', 'convertfreq', 'constrain',
+    'appender', 'avail', 'can_broadcast', 'constrain',
     'constrain_horizon', 'dropcols', 'encode', 'equal_weights',
     'expanding_stdize', 'isiterable', 'public_dir',
     'random_tickers', 'random_weights', 'rolling_windows', 'view',
-    'unique_everseen', 'uniqify',
-    'DAYS', 'MONTHS', 'WEEKOFFSETS', 'QTROFFSETS', 'ANNOFFSETS',
-    'FREQS', 'FREQMAP'
+    'unique_everseen', 'uniqify'
     ]
 
 from collections import Callable
@@ -65,6 +63,7 @@ import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
 from pandas.tseries import offsets
+from pandas.tseries.frequencies import FreqGroup, get_freq_code
 
 
 PY37 = sys.version_info.major == 3 and sys.version_info.minor >= 7
@@ -132,82 +131,6 @@ def can_broadcast(*args):
         return True
     except ValueError:
         return False
-
-
-DAYS = ('MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN')
-MONTHS = ('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP',
-          'OCT', 'NOV', 'DEC')
-
-WEEKOFFSETS = ('W-%s' % d for d in DAYS)
-QTROFFSETS = (['%s-%s' % (i, m) for m in MONTHS] for i in
-              ('Q', 'QS', 'BQ', 'BQS'))
-ANNOFFSETS = (['%s-%s' % (i, m) for m in MONTHS] for i in
-              ('A', 'AS', 'BA', 'BAS'))
-
-from_iter = itertools.chain.from_iterable
-FREQS = {'D': 252., 'W': 52., 'M': 12., 'Q': 4., 'A': 1.}
-FREQS.update(zip(WEEKOFFSETS, [52.] * 48))
-FREQS.update(zip(from_iter(QTROFFSETS), [4.] * 48))
-FREQS.update(zip(from_iter(ANNOFFSETS), [1.] * 48))
-
-
-def convertfreq(freq):
-    """Convert string frequency to periods per year.
-
-    Used in upsampling & downsampling.
-
-    Parameters
-    ----------
-    freq : str
-        May be one of ('D', 'W', 'M', 'Q', 'A') or any of Pandas
-        *anchored offset alises*, such as 'W-FRI'.  Case-insensitive.
-
-    Example
-    -------
-    >>> from pyfinance import utils
-
-    >>> utils.convertfreq('M')
-    12.0
-    >>> utils.convertfreq('BQS-DEC')
-    4.0
-
-    .. _Pandas Offset Aliases:
-        pandas.pydata.org/pandas-docs/stable/timeseries.html#anchored-offsets
-    """
-
-    freq = freq.upper()
-    return FREQS.get(freq)
-
-
-# TODO: business-day
-FREQMAP = {}
-for k in FREQS:
-    if k.startswith(('M', 'W', 'Q', 'A', 'D')):
-        FREQMAP[k] = k[0]
-    elif k.startswith('B'):
-        # BAS-OCT, BQ-SEP, etc.
-        FREQMAP[k] = k[1]
-
-
-def mapfreq(offset):
-    """Convert 'full' offset string to its base.
-
-    Parameters
-    ----------
-    freq : str
-        May be one of ('D', 'W', 'M', 'Q', 'A') or any of Pandas
-        *anchored offset alises*, such as 'W-FRI'.  Case-insensitive.
-
-    Returns
-    -------
-    str : {'D', 'W', 'M', 'Q', 'A'}
-
-    .. _Pandas Offset Aliases:
-        pandas.pydata.org/pandas-docs/stable/timeseries.html#anchored-offsets
-    """
-
-    offset = offset.upper()
-    return FREQMAP.get(offset)
 
 
 def constrain(*objs):
@@ -519,6 +442,73 @@ def expanding_stdize(obj, **kwargs):
 
     return (obj - obj.expanding(**kwargs).mean())\
         / (obj.expanding(**kwargs).std())
+
+
+# Annualization factors.  The keys are multiples of 1000
+# representing Pandas frequency groups.
+# Technically, all of these are just an approximation.  For example,
+# there are 251 NYSE trading days in 2017, 252 in 2016 & 2018.
+
+PERIODS_PER_YEAR = {
+    FreqGroup.FR_ANN: 1.,
+    FreqGroup.FR_QTR: 4.,
+    FreqGroup.FR_MTH: 12.,
+    FreqGroup.FR_WK: 52.,
+    FreqGroup.FR_BUS: 252.,
+    FreqGroup.FR_DAY: 252.,  # All days are business days
+    FreqGroup.FR_HR: 252. * 6.5,
+    FreqGroup.FR_MIN: 252. * 6.5 * 60,
+    FreqGroup.FR_SEC: 252. * 6.5 * 60 * 60,
+    FreqGroup.FR_MS: 252. * 6.5 * 60 * 60,
+    FreqGroup.FR_US: 252. * 6.5 * 60 * 60 * 1000,
+    FreqGroup.FR_NS: 252. * 6.5 * 60 * 60 * 1000 * 1000  # someday...
+    }
+
+
+def get_anlz_factor(freq):
+    """Find the number of periods per year given a frequency.
+
+    Parameters
+    ----------
+    freq : str
+        Any frequency str or anchored offset str recognized by Pandas.
+
+    Returns
+    -------
+    float
+
+    Example
+    -------
+    >>> get_periods_per_year('D')
+    252.0
+    >>> get_periods_per_year('5D')  # 5-business-day periods per year
+    50.4
+
+    >>> get_periods_per_year('Q')
+    4.0
+    >>> get_periods_per_year('Q-DEC')
+    4.0
+    >>> get_periods_per_year('BQS-APR')
+    4.0
+    """
+
+    # 'Q-NOV' would give us (2001, 1); we just want (2000, 1).
+    try:
+        base, mult = get_freq_code(freq)
+    except ValueError:
+        # The above will fail for a bunch of irregular frequencies, such
+        # as 'Q-NOV' or 'BQS-APR'
+        freq = freq.upper()
+        if freq.startswith(('A-', 'BA-', 'AS-', 'BAS-')):
+            freq = 'A'
+        elif freq.startswith(('Q-', 'BQ-', 'QS-', 'BQS-')):
+            freq = 'Q'
+        elif freq in {'MS', 'BMS'}:
+            freq = 'M'
+        else:
+            raise ValueError('Invalid frequency: %s' % freq)
+        base, mult = get_freq_code(freq)
+    return PERIODS_PER_YEAR[(base // 1000) * 1000] / mult
 
 
 def isiterable(obj):

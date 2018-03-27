@@ -283,7 +283,7 @@ class BestFitDist(object):
 
 
 def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
-                 linewidths=0.5, square=True, figsize=(10,10), **kwargs):
+                 linewidths=0.5, square=True, figsize=(10, 10), **kwargs):
     """Wrapper around seaborn.heatmap for visualizing correlation matrix.
 
     Parameters
@@ -803,7 +803,7 @@ class PortSim(object):
 
         # Net of fees (not yet of distributions)
         self.net = (1. + self.gross.values) \
-            * (1. - self.feesched.reshape(-1,1)) - 1.
+            * (1. - self.feesched.reshape(-1, 1)) - 1.
         self.net = pd.DataFrame(self.net, index=self.index,
                                 columns=self.columns)
 
@@ -817,7 +817,7 @@ class PortSim(object):
 
         if self.dist_amt is not None:
             ri = returns.return_index(self.net)
-            t = (ri.index.is_quarter_end.reshape((-1,1)) / ri).cumsum()
+            t = (ri.index.is_quarter_end.reshape((-1, 1)) / ri).cumsum()
             res = ri * (self.v0 - self.dist_amt * t)
             if self.include_start:
                 res = returns.insert_start(res, base=self.v0)
@@ -886,7 +886,7 @@ class TEOpt(object):
         xs = []
         funs = []
         for i, j in zip(self._r, self._proxies):
-            opt = sco.minimize(te, x0=ew, args=(i,j), method='SLSQP',
+            opt = sco.minimize(te, x0=ew, args=(i, j), method='SLSQP',
                                bounds=bnds, constraints=cons)
             x, fun = opt['x'], opt['fun']
             xs.append(x)

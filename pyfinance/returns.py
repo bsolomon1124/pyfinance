@@ -28,8 +28,14 @@ import copy
 from numbers import Number
 
 import numpy as np
+from numpy.lib.nanfunctions import (nanmin,
+                                    nansum,
+                                    nanprod,
+                                    nancumsum,
+                                    nancumprod,
+                                    nanmean,
+                                    nanstd)
 import pandas as pd
-from pandas import tseries
 
 from pyfinance import ols, utils
 
@@ -42,39 +48,15 @@ class TSeries(pd.Series):
         args = tuple(copy.deepcopy(arg) for arg in args)
         freq = kwargs.pop('freq', None)
         super().__init__(*args, **kwargs)
+        self.freq = freq
 
-        if freq is None:
-            if hasattr(self.index, 'freq'):
-                if self.index.freq is not None:
-                    self.freq = self.index.freqstr
-                else:
-                    freq = pd.infer_freq(self.index)
-                    if freq is None:
-                        data = args[0]
-                        if isinstance(data, TSeries):
-                            freq = data.freq
-                            if freq is None:
-                                err = ('A frequency (`freq`) was not passed',
-                                       ' and cannot be inferred from the',
-                                       ' resulting Index.')
-                                raise FrequencyError(err)
-                    else:
-                        self.freq = freq
-                        self.index.freq = tseries.frequencies.to_offset(freq)
-            else:
-                # We're SOL.
-                raise FrequencyError('A frequency (`freq`) was not passed, and'
-                                     ' the resulting Index is not'
-                                     ' datetime-like.')
-        else:
-            # The passed parameter takes priority.
-            # But, still make sure we're working with a valid index.
-            self.freq = freq
-            if hasattr(self.index, 'freq'):
-                self.index.freq = pd.tseries.frequencies.to_offset(freq)
-            else:
-                raise FrequencyError('The resulting Index must be'
-                                     ' datetime-like.')
+        # Hold off on inferring a frequency until method calls.
+        # Otherwise, this routine is run unncessarily because
+        # __init__ gets called somewhat frequently
+        # (with __repr__, for instance).
+
+        if not self.index.is_monotonic_increasing:
+            raise FrequencyError('Input Index should be sorted.')
 
     @property
     def _constructor(self):
@@ -127,9 +109,9 @@ class TSeries(pd.Series):
         end = self.index[-1]
         td = end - start
         n = (td.days - 1.) / 365.
-        return self.ret_rels().prod() ** (1. / n) - 1.
+        return nanprod(self.ret_rels()) ** (1. / n) - 1.
 
-    def anlzd_stdev(self, ddof=0, **kwargs):
+    def anlzd_stdev(self, ddof=0, freq=None, **kwargs):
         """Annualized standard deviation with `ddof` degrees of freedom.
 
         Parameters
@@ -138,13 +120,18 @@ class TSeries(pd.Series):
             Degrees of freedom, passed to pd.Series.std().
         **kwargs
             Passed to pd.Series.std().
+        TODO: freq
 
         Returns
         -------
         float
         """
 
-        return self.std(ddof=ddof) * utils.convertfreq(self.freq) ** 0.5
+        if freq is None:
+            freq = self._try_get_freq()
+            if freq is None:
+                raise FrequencyError(msg)
+        return nanstd(self, ddof=ddof) * freq ** 0.5
 
     def batting_avg(self, benchmark):
         """Percentage of periods when `self` outperformed `benchmark`.
@@ -447,7 +434,7 @@ class TSeries(pd.Series):
         # Thank you @cᴏʟᴅsᴘᴇᴇᴅ
         # https://stackoverflow.com/a/47892766/7954504
         dd = self.drawdown_idx()
-        mask = (dd == dd.min()).cumsum().astype(bool)
+        mask = nancumsum(dd == nanmin(dd.min)).astype(bool)
         start = dd.mask(mask)[::-1].idxmax()
         if return_date:
             return start.date()
@@ -483,7 +470,10 @@ class TSeries(pd.Series):
 
         elif method == 'ecr':
             er = self.ret_idx() - benchmark.ret_idx() + 1
-            return er / np.maximum.accumulate(er) - 1.
+            if er.isnull().any():
+                return er / er.cummax() - 1.
+            else:
+                return er / np.maximum.accumulate(er) - 1.
 
         elif method == 'ecrr':
             # Credit to: SO @piRSquared
@@ -553,7 +543,7 @@ class TSeries(pd.Series):
 
         gt = self > 0
         lt = self < 0
-        return (np.sum(gt) / np.sum(lt)) * (self[gt].mean() / self[lt].mean())
+        return (nansum(gt) / nansum(lt)) * (self[gt].mean() / self[lt].mean())
 
     def geomean(self):
         """Geometric mean return over the entire sample.
@@ -563,7 +553,7 @@ class TSeries(pd.Series):
         float
         """
 
-        self.ret_rels().prod() ** (1. / self.count()) - 1.
+        return nanprod(self.ret_rels()) ** (1. / self.count()) - 1.
 
     def growth_of_x(self, x=1.):
         """Ending value from growth of `x`, a scalar.
@@ -607,7 +597,7 @@ class TSeries(pd.Series):
         float
         """
 
-        return self.drawdown_idx().min()
+        return nanmin(self.drawdown_idx())
 
     def msquared(self, benchmark, rf=0.02, ddof=0):
         """M-squared, return scaled by relative total risk.
@@ -688,8 +678,8 @@ class TSeries(pd.Series):
 
         dd = self.drawdown_idx()
         # False beginning on trough date and all later dates.
-        mask = (dd != dd.min()).cumprod().astype(bool)
-        res = dd.mask(mask).eq(0.)
+        mask = nancumprod(dd != nanmin(dd)).astype(bool)
+        res = dd.mask(mask) == 0
 
         # If `res` is all False (recovery has not occured),
         # .idxmax() will return `res.index[0]`.
@@ -801,7 +791,7 @@ class TSeries(pd.Series):
         """
         return self.CAPM(benchmark, **kwargs).rsq_adj
 
-    def semi_stdev(self, threshold=0., ddof=0):
+    def semi_stdev(self, threshold=0., ddof=0, freq=None):
         """Semi-standard deviation; stdev of downside returns.
 
         It is designed to address that fact that plain standard
@@ -826,9 +816,13 @@ class TSeries(pd.Series):
         float
         """
 
+        if freq is None:
+            freq = self._try_get_freq()
+            if freq is None:
+                raise FrequencyError(msg)
         n = self.count() - ddof
-        ss = (np.sum(np.minimum(self - threshold, 0.) ** 2) ** 0.5) / n
-        return ss * utils.convertfreq(self.freq) ** 0.5
+        ss = (nansum(np.minimum(self - threshold, 0.) ** 2) ** 0.5) / n
+        return ss * freq ** 0.5
 
     def sharpe_ratio(self, rf=0.02, ddof=0):
         """Return over `rf` per unit of total risk.
@@ -993,7 +987,7 @@ class TSeries(pd.Series):
             http://www.tangotools.com/ui/ui.htm
         """
 
-        return np.mean(self.drawdown_idx() ** 2) ** 0.5
+        return nanmean(self.drawdown_idx() ** 2) ** 0.5
 
     def up_capture(self, benchmark, threshold=0., compare_op='ge'):
         """Upside capture ratio.
@@ -1134,6 +1128,16 @@ class TSeries(pd.Series):
                 rf = rf.anlzd_ret()
         return rf
 
+    def _try_get_freq(self):
+        if self.freq is None:
+            freq = pd.infer_freq(self.index)
+            if freq is None:
+                raise FrequencyError('No frequency was passed at'
+                                     ' instantiation, and one cannot'
+                                     ' be inferred.')
+        freq = utils.get_anlz_factor(freq)
+        return freq
+
 
 def _try_to_squeeze(obj, raise_=False):
     """Attempt to squeeze to 1d Series.
@@ -1164,6 +1168,12 @@ class TFrame(object):
         raise NotImplementedError
 
 
+# Default
+msg = ('A frequency was not passed to the method or at'
+       ' instantiation, and could not otherwise be inferred from the'
+       ' Index.')
+
+
 # ---------------------------------------------------------------------
 # Long-form docstring shared between TSeries & TFrame.
 
@@ -1173,10 +1183,8 @@ Time series of periodic returns for {securities}.
 Subclass of `pandas.{obj}`, with an extended set of methods
 geared towards calculating common investment metrics.
 
-The main structural difference between `{name}` and a Pandas
-{obj} is that {name} *must* have a datetime-like index with a
-discernable frequency.  This is enforced strictly during
-instantiation.
+It attempts to optimize for speed, not adding much incremental overhead
+on top of the underlying NumPy and Pandas calls.
 
 Parameters
 ----------
@@ -1263,12 +1271,10 @@ for method in methods:
 
 TSeries.__doc__ = doc.format(securities='a single security',
                              obj='Series',
-                             name='TSeries',
                              methods=tseries_method_doc.strip(),
                              examples='TODO')
 
 TFrame.__doc__ = doc.format(securities='multiple securities',
                             obj='DataFrame',
-                            name='TFrame',
                             methods='TODO',
                             examples='TODO')

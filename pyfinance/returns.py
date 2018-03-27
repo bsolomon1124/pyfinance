@@ -563,7 +563,7 @@ class TSeries(pd.Series):
         float
         """
 
-        return self.ret_rels().prod() * x
+        return nanprod(self.ret_rels()) * x
 
     def info_ratio(self, benchmark, ddof=0):
         """Information ratio--return per unit of active risk.

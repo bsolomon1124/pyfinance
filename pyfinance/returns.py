@@ -851,7 +851,7 @@ class TSeries(pd.Series):
         """
 
         rf = self._validate_rf(rf)
-        stdev = self.anlzd_std(ddof=ddof)
+        stdev = self.anlzd_stdev(ddof=ddof)
         return (self.anlzd_ret() - rf) / stdev
 
     def sortino_ratio(self, threshold=0., ddof=0):

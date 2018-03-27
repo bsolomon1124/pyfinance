@@ -335,7 +335,7 @@ class RollingOLS(object):
     has_const : bool, default False
         Specifies whether `x` includes a user-supplied constant (a column
         vector).  If False, it is added at instantiation
-    use_const ; bool, default True
+    use_const : bool, default True
         Whether to include an intercept term in the model output.  Note the
         difference between has_const and use_const.  The former specifies
         whether a column vector of 1s is included in the input; the latter

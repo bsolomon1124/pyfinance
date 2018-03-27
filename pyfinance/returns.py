@@ -260,7 +260,7 @@ class TSeries(pd.Series):
         float
         """
 
-        self.growth_of_x() - 1.
+        return self.growth_of_x() - 1.
 
     def cuml_idx(self):
         """Cumulative return index--a TSeries of cumulative returns.
@@ -270,7 +270,7 @@ class TSeries(pd.Series):
         TSeries
         """
 
-        self.ret_idx() - 1.
+        return self.ret_idx() - 1.
 
     def down_capture(self, benchmark, threshold=0., compare_op='lt'):
         """Downside capture ratio.

@@ -590,7 +590,7 @@ class PCA(object):
             self.feature_names = m.columns
             self.m = m.values
         else:
-            self.feature_names = range(1, m.shape[1] + 1)
+            self.feature_names = range(m.shape[1])
             self.m = m
         if np.isnan(self.m).any():
             raise ValueError('Input contains NaN')
@@ -638,8 +638,9 @@ class PCA(object):
         # This implementation uses u_based_decision=False rather than the
         # default True to flip that logic and ensure the resulting
         # components and loadings have high positive coefficients
-        self.u, self.v = svd_flip(self.u, self.v,
-                                  u_based_decision=self.u_based_decision)
+        self.u, self.vt = svd_flip(self.u, self.v,
+                                   u_based_decision=self.u_based_decision)
+        self.v = self.vt.T
 
         # Drop eigenvalues with value > threshold
         # *keep* is number of components retained

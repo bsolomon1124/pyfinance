@@ -18,7 +18,7 @@ load_retaildata
 
 __author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
 __all__ = ['load_factors', 'load_industries', 'load_rates', 'load_shiller',
-           'load_rf']
+           'load_rf', 'load_13f']
 
 import itertools
 

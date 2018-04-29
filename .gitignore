@@ -16,6 +16,7 @@ notes/
 *.xls
 *.xlsx
 *.ipynb
+*.txt
 # -------------------------------------
 
 # Enclosing folder metadata

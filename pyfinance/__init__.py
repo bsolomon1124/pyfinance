@@ -1,4 +1,4 @@
-"""Python package designed for general financial and security returns analysis.
+"""pyfinance: investment management and security returns analysis.
 
 Modules
 -------

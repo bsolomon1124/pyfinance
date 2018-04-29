@@ -1,6 +1,4 @@
-"""Generalized core utilities in the pyfinance package.
-
-Some do not pertain directly to finance.
+"""pyfinance utility functions.
 
 Descriptions
 ------------
@@ -125,7 +123,6 @@ def avail(df):
 
 def can_broadcast(*args):
     """Logic test: can input arrays be broadcast?"""
-    # TODO: `def fix_broadcast`: attempt to reshape
     try:
         np.broadcast(*args)
         return True
@@ -153,7 +150,7 @@ def constrain(*objs):
     # A little bit of set magic below.
     # Note that pd.Index.intersection only applies to 2 Index objects
     common_idx = pd.Index(set.intersection(*[set(o.index) for o in objs]))
-    new_dfs = [o.reindex(common_idx) for o in objs]
+    new_dfs = (o.reindex(common_idx) for o in objs)
 
     return tuple(new_dfs)
 
@@ -512,6 +509,9 @@ def get_anlz_factor(freq):
 
 
 def isiterable(obj):
+    # Or: collections.Iterable
+    # Notice this will return True for strings even though they "look"
+    # different than other Python sequence objects.
     try:
         obj.__iter__()
         return True

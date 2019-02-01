@@ -86,7 +86,7 @@ def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05,
 
 def _handle_ab(solution, use_const=True):
     b = solution[1:] if use_const else solution
-    b = np.asscalar(b) if b.size == 1 else b
+    b = b.item() if b.size == 1 else b
     a = solution[0] if use_const else None
     return a, b
 
@@ -177,8 +177,9 @@ class OLS(object):
     @property
     def condition_number(self):
         """Condition number of x; ratio of largest to smallest eigenvalue."""
-        x = np.matrix(self.x)
-        ev = np.linalg.eig(x.T * x)[0]
+        # Mimic x = np.matrix(self.x) (deprecated)
+        x = np.atleast_2d(self.x)
+        ev = np.linalg.eig(x.T @ x)[0]
         return np.sqrt(ev.max() / ev.min())
 
     @property
@@ -265,9 +266,9 @@ class OLS(object):
     @property
     def _se_all(self):
         """Standard errors (SE) for all parameters, including the intercept."""
-        x = np.matrix(self.x)
+        x = np.atleast_2d(self.x)
         err = np.atleast_1d(self.ms_err)
-        se = np.sqrt(np.diagonal(np.linalg.inv(x.T * x)) * err[:, None])
+        se = np.sqrt(np.diagonal(np.linalg.inv(x.T @ x)) * err[:, None])
         return np.squeeze(se)
 
     @property

@@ -132,7 +132,8 @@ class OLS(object):
     """
 
     def __init__(self, y, x=None, has_const=False, use_const=True):
-        self.x, self.y, self.k = _clean_xy(y, x)
+        self.x, self.y, self.k = _clean_xy(y=y, x=x, has_const=has_const,
+                                           use_const=use_const)
         self.n = y.shape[0]
 
         # np.lstsq(a,b): Solves the equation a x = b by computing a vector x
@@ -346,7 +347,8 @@ class RollingOLS(object):
 
     def __init__(self, y, x=None, window=None, has_const=False,
                  use_const=True):
-        self.x, self.y, self.k = _clean_xy(y, x)
+        self.x, self.y, self.k = _clean_xy(y=y, x=x, has_const=has_const,
+                                           use_const=use_const)
         self.window = self.n = window
         self.xwins = utils.rolling_windows(self.x, window=window)
         self.ywins = utils.rolling_windows(self.y, window=window)

@@ -9,9 +9,11 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn.datasets import make_regression
 
-from pyfinance.ols import OLS, RollingOLS
+from pyfinance.ols import OLS, RollingOLS, _rolling_lstsq, PandasRollingOLS
+from pyfinance import utils
 
 RTOL = 1e-03
 WINDOW = 25
@@ -398,6 +400,75 @@ def test_rolling_ols():
                 assert np.allclose(v, attr, rtol=RTOL)
 
 
-def test_pandas_rolling_ols():
-    # TODO
-    pass
+
+window = 4
+y = np.array([1, 3, 5, 7, 9, 11, 13], dtype=np.float64)
+x1 = np.arange(7, dtype=np.float64)
+x2 = np.array(
+    [
+        0.976745506,
+        0.13081688,
+        0.415920635,
+        0.154081322,
+        0.359122273,
+        0.917051723,
+        0.705650721
+    ],
+    dtype=np.float64
+)
+
+x = np.stack((x1, x2)).T  # shape (7, 2) - x1 and x2 as columns
+x_with = np.stack((x1, x2, np.repeat(1., len(x1)))).T  # with artificial constant
+x1_with = np.stack((x1, np.repeat(1., len(x1)))).T  # with artificial constant
+
+outs = (
+    np.array([[ 2.32241042,  1.04305696],
+              [ 2.18848609,  1.51863796],
+              [ 2.29824933, -0.2877955 ],
+              [ 2.29513731, -0.6887367 ]]),
+    np.array([[2., 0., 1.],
+              [2., 0., 1.],
+              [2., 0., 1.],
+              [2., 0., 1.]]),
+    np.array([[2., 1.],
+              [2., 1.],
+              [2., 1.],
+              [2., 1.]]),
+    np.array([2.42857143, 2.33333333, 2.25925926, 2.20930233])
+)
+
+
+@pytest.mark.parametrize('x,y,window,out', [
+    (x, y, window, outs[0]),
+    (x_with, y, window, outs[1]),
+    (x1_with, y, window, outs[2]),
+    (x1, y, window, outs[3]),
+])
+def test__rolling_lstsq(x, y, window, out):
+    xwins = utils.rolling_windows(x, window)
+    ywins = utils.rolling_windows(y, window)
+    assert np.allclose(
+        _rolling_lstsq(xwins, ywins),
+        out
+    )
+
+
+def test_const_false():
+    # Case where use_const=False and has_const=False
+    # See Issue # 6
+    X = pd.DataFrame(np.arange(5), columns=['X'])
+    Y = pd.DataFrame(np.arange(0, 10, 2) + 1, columns=['Y'])
+    window = 2
+    reg_df = pd.concat([Y, X], axis=1)
+    rr = PandasRollingOLS(y=reg_df.iloc[:, 0],  # Series
+                              x=reg_df.iloc[:, 1:],  # DataFrame
+                              window=window,
+                              has_const=False,
+                              use_const=False)
+    assert np.allclose(
+        rr.beta.values,
+        np.array([[3.        ],
+                  [2.6       ],
+                  [2.38461538],
+                  [2.28      ]])
+    )

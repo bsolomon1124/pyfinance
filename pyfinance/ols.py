@@ -19,6 +19,22 @@ from pyfinance import utils
 
 def _rolling_lstsq(x, y):
     """Finds solution for the rolling case.  Matrix formulation."""
+    if x.ndim == 2:
+        # Treat everything as 3d and avoid AxisError on .swapaxes(1, 2) below
+        # This means an original input of:
+        #     array([0., 1., 2., 3., 4., 5., 6.])
+        # becomes:
+        # array([[[0.],
+        #         [1.],
+        #         [2.],
+        #         [3.]],
+        #
+        #        [[1.],
+        #         [2.],
+        #         ...
+        x = x[:, :, None]
+    elif x.ndim <= 1:
+        raise AxisError("x should have ndmi >= 2")
     return np.squeeze(np.matmul(np.linalg.inv(np.matmul(x.swapaxes(1, 2), x)),
                       np.matmul(x.swapaxes(1, 2), np.atleast_3d(y))))
 

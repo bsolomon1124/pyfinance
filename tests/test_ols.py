@@ -12,7 +12,8 @@ import pandas as pd
 import pytest
 from sklearn.datasets import make_regression
 
-from pyfinance.ols import OLS, RollingOLS, _rolling_lstsq, PandasRollingOLS
+from pyfinance import ols
+from pyfinance.ols import OLS, RollingOLS, PandasRollingOLS
 from pyfinance import utils
 
 RTOL = 1e-03
@@ -448,7 +449,7 @@ def test__rolling_lstsq(x, y, window, out):
     xwins = utils.rolling_windows(x, window)
     ywins = utils.rolling_windows(y, window)
     assert np.allclose(
-        _rolling_lstsq(xwins, ywins),
+        ols._rolling_lstsq(xwins, ywins),
         out
     )
 
@@ -472,3 +473,22 @@ def test_const_false():
                   [2.38461538],
                   [2.28      ]])
     )
+
+
+def test_add_const():
+    X = pd.DataFrame(np.arange(5), columns=['X'])
+    Y = pd.Series(np.arange(0, 10, 2) + 1)
+    rr = ols.OLS(y=Y,
+                 x=X,
+                 has_const=False,
+                 use_const=True)
+    assert rr.x.ndim == 2
+    assert rr.y.ndim == 1
+    assert ols._confirm_constant(rr.x)
+
+
+def test_confirm_constant():
+    has = np.array([[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]])
+    missing = np.array([[0, 1], [1, 1], [2, 1], [3, 1], [4, 2]])
+    assert ols._confirm_constant(has)
+    assert not ols._confirm_constant(missing)

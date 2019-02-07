@@ -14,8 +14,6 @@ from statsmodels.tools import add_constant
 
 from pyfinance import utils
 
-# TODO: confidence intervals
-
 
 def _rolling_lstsq(x, y):
     """Finds solution for the rolling case.  Matrix formulation."""
@@ -41,7 +39,8 @@ def _rolling_lstsq(x, y):
 
 def _confirm_constant(a):
     """Confirm `a` has volumn vector of 1s."""
-    return np.any(np.equal(np.ptp(a, axis=0), 1.))
+    a = np.asanyarray(a)
+    return np.isclose(a, 1.).all(axis=0).any()
 
 
 def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05,
@@ -76,7 +75,13 @@ def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05,
             raise ValueError('Data appears to be ~N(0,1).  Specify'
                              ' use_constant=False.')
         # `has_constant` does checking on its own and raises VE if True
-        a = add_constant(a, has_constant='raise')
+        try:
+            a = add_constant(a, has_constant='raise')
+        except ValueError as e:
+            raise ValueError(
+                'X data already contains a constant; please specify'
+                ' has_const=True'
+            ) from e
         k = a.shape[-1] - 1
     else:
         raise ValueError('`use_const` == False implies has_const is False.')

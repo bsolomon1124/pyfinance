@@ -61,7 +61,10 @@ import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
 from pandas.tseries import offsets
-from pandas.tseries.frequencies import FreqGroup, get_freq_code
+try:
+    from pandas.tseries.frequencies import FreqGroup, get_freq_code
+except ImportError:  # 0.24+, or somewhere around then
+    from pandas._libs.tslibs.frequencies import FreqGroup, get_freq_code
 
 
 PY37 = sys.version_info.major == 3 and sys.version_info.minor >= 7

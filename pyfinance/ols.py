@@ -34,7 +34,7 @@ def _rolling_lstsq(x, y):
         #         ...
         x = x[:, :, None]
     elif x.ndim <= 1:
-        raise AxisError("x should have ndmi >= 2")
+        raise np.AxisError("x should have ndmi >= 2")
     return np.squeeze(np.matmul(np.linalg.inv(np.matmul(x.swapaxes(1, 2), x)),
                       np.matmul(x.swapaxes(1, 2), np.atleast_3d(y))))
 

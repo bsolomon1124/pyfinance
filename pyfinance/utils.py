@@ -9,8 +9,6 @@ avail
     Return start & end availability for each column in a DataFrame.
 can_broadcast
     Logic test: can input NumPy arrays be broadcast?
-convertfreq
-    Convert string frequencies to periods per year.
 constrain
     Constrain group of DataFrames & Series to intersection of indices.
 constrain_horizon
@@ -25,6 +23,8 @@ expanding_stdize
     Standardize a pandas object column-wise on expanding window.
 flatten
     Flatten a nested iterable.  Returns a generator object.
+get_anlz_factor
+    Find the number of periods per year given a frequency.
 isiterable
     Test whether `obj` is iterable.
 public_dir
@@ -479,16 +479,16 @@ def get_anlz_factor(freq):
 
     Example
     -------
-    >>> get_periods_per_year('D')
+    >>> get_anlz_factor('D')
     252.0
-    >>> get_periods_per_year('5D')  # 5-business-day periods per year
+    >>> get_anlz_factor('5D')  # 5-business-day periods per year
     50.4
 
-    >>> get_periods_per_year('Q')
+    >>> get_anlz_factor('Q')
     4.0
-    >>> get_periods_per_year('Q-DEC')
+    >>> get_anlz_factor('Q-DEC')
     4.0
-    >>> get_periods_per_year('BQS-APR')
+    >>> get_anlz_factor('BQS-APR')
     4.0
     """
 

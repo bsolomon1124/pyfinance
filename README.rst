@@ -423,9 +423,9 @@ The :code:`utils.py` module contains odds-and-ends utilities.
     # Convert Pandas offset alises to periods per year.
     >>> from pyfinance import utils
 
-    >>> utils.convertfreq('M')
+    >>> utils.get_anlz_factor('M')
     12.0
-    >>> utils.convertfreq('BQS-DEC')
+    >>> utils.get_anlz_factor('BQS-DEC')
     4.0
 
 ---

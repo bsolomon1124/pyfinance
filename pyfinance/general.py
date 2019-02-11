@@ -123,7 +123,7 @@ def amortize(rate, nper, pv, freq='M'):
     360  1289.94 -1289.94     -7.26    -0.00
     """
 
-    freq = utils.convertfreq(freq)
+    freq = utils.get_anlz_factor(freq)
     rate = rate / freq
     nper = nper * freq
 
@@ -777,7 +777,7 @@ class PortSim(object):
             self.fee_freq = fee_freq
             self.fee = fee / self.fee_freq
         elif isinstance(fee_freq, str):
-            self.fee_freq = utils.convertfreq(fee_freq)
+            self.fee_freq = utils.get_anlz_factor(fee_freq)
             self.fee = fee / self.fee_freq
 
         # Logic for interaction of `start`, `end`, and `lookback`

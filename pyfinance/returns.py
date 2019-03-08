@@ -614,7 +614,7 @@ class TSeries(pd.Series):
         float
         """
 
-        diff = self.excess_ret(benchmark).anlzd_return()
+        diff = self.excess_ret(benchmark).anlzd_ret()
         return diff / self.tracking_error(benchmark, ddof=ddof)
 
     def max_drawdown(self):

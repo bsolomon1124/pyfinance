@@ -9,6 +9,37 @@ It is meant to be a complement to existing packages geared towards quantitative 
 <https://github.com/pydata/pandas-datareader>`_, and `fecon235
 <https://github.com/rsvp/fecon235>`_.
 
+
+<table>
+<tr>
+  <td>Supports</td>
+  <td>Python 3.5 | 3.6 | 3.7</td>
+</tr>
+<tr>
+  <td>Latest Release</td>
+  <td>
+    <a href="https://pypi.org/project/pyfinance/">
+    <img src="https://img.shields.io/pypi/v/pyfinance.svg" alt="latest release" />
+    </a>
+  </td>
+</tr>
+<tr>
+  <td>Package Status</td>
+  <td>
+    <a href="https://pypi.org/project/pyfinance/">
+    <img src="https://img.shields.io/pypi/status/pyfinance.svg" alt="status" /></td>
+    </a>
+</tr>
+<tr>
+  <td>License</td>
+  <td>
+    <a href="https://github.com/bsolomon1124/pyfinance/blob/master/LICENSE">
+    <img src="https://img.shields.io/pypi/l/pyfinance.svg" alt="license" />
+    </a>
+</td>
+</tr>
+</table>
+
 --------
 Contents
 --------

@@ -492,3 +492,30 @@ def test_confirm_constant():
     missing = np.array([[0, 1], [1, 1], [2, 1], [3, 1], [4, 2]])
     assert ols._confirm_constant(has)
     assert not ols._confirm_constant(missing)
+
+
+def test_datareader_frame():
+    import os.path
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pdr.csv')
+    data = pd.read_csv(p)
+    y = data['usd']
+    x = data.drop('usd', axis=1)
+    window = 12  # months
+    model = PandasRollingOLS(y=y, x=x, window=window)
+    assert isinstance(model.beta, pd.DataFrame)
+    assert model.beta.shape == (219, 2)
+    tgt = np.array([[ 3.28409826e-05, -5.42606172e-02],
+                    [ 2.77474638e-04, -1.88556396e-01],
+                    [ 2.43179753e-03, -2.94865331e-01],
+                    [ 2.79584924e-03, -3.34879522e-01],
+                    [ 2.44759386e-03, -2.41902450e-01]])
+    assert np.allclose(model.beta.head().values, tgt)
+
+
+def test_1d_x():
+    # See issue #12
+    data = {'A': [2, 3, 4, 5, 6], 'B': [10, 11, 12, 13, 14]}
+    df = pd.DataFrame(data)
+    rolling = ols.RollingOLS(y=df['B'], x=df['A'], window=3, has_const=False, use_const=False)
+    assert np.allclose(rolling.x, np.array([2, 3, 4, 5, 6])[:, None])
+    assert np.allclose(rolling.y, np.array([10, 11, 12, 13, 14]))

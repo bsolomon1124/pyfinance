@@ -115,7 +115,8 @@ def _clean_xy(y, x=None, has_const=False, use_const=True):
     k, x = _check_constant_params(x, has_const=has_const,
                                   use_const=use_const)
     y = np.squeeze(y)
-    x = np.atleast_2d(x)
+    if x.ndim == 1:
+        x = x[:, None]
     assert y.ndim == 1 and x.ndim > 1
     return x, y, k
 

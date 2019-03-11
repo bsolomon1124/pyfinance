@@ -1,8 +1,8 @@
 """Ordinary least-squares (OLS) regression.  Static and rolling cases."""
 
 
-__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
-__all__ = ['OLS', 'RollingOLS', 'PandasRollingOLS']
+__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
+__all__ = ["OLS", "RollingOLS", "PandasRollingOLS"]
 
 
 from functools import lru_cache
@@ -33,18 +33,23 @@ def _rolling_lstsq(x, y):
         x = x[:, :, None]
     elif x.ndim <= 1:
         raise np.AxisError("x should have ndmi >= 2")
-    return np.squeeze(np.matmul(np.linalg.inv(np.matmul(x.swapaxes(1, 2), x)),
-                      np.matmul(x.swapaxes(1, 2), np.atleast_3d(y))))
+    return np.squeeze(
+        np.matmul(
+            np.linalg.inv(np.matmul(x.swapaxes(1, 2), x)),
+            np.matmul(x.swapaxes(1, 2), np.atleast_3d(y)),
+        )
+    )
 
 
 def _confirm_constant(a):
     """Confirm `a` has volumn vector of 1s."""
     a = np.asanyarray(a)
-    return np.isclose(a, 1.).all(axis=0).any()
+    return np.isclose(a, 1.0).all(axis=0).any()
 
 
-def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05,
-                           atol=1e-08):
+def _check_constant_params(
+    a, has_const=False, use_const=True, rtol=1e-05, atol=1e-08
+):
     """Helper func to interaction between has_const and use_const params.
 
     has_const   use_const   outcome
@@ -57,34 +62,37 @@ def _check_constant_params(a, has_const=False, use_const=True, rtol=1e-05,
 
     if all((has_const, use_const)):
         if not _confirm_constant(a):
-            raise ValueError('Data does not contain a constant; specify'
-                             ' has_const=False')
+            raise ValueError(
+                "Data does not contain a constant; specify" " has_const=False"
+            )
         k = a.shape[-1] - 1
     elif not any((has_const, use_const)):
         if _confirm_constant(a):
-            raise ValueError('Data already contains a constant; specify'
-                             ' has_const=True')
+            raise ValueError(
+                "Data already contains a constant; specify" " has_const=True"
+            )
         k = a.shape[-1]
     elif not has_const and use_const:
         # Also run a quick check to confirm that `a` is *not* ~N(0,1).
         #     In this case, constant should be zero. (exclude it entirely)
-        c1 = np.allclose(a.mean(axis=0), b=0., rtol=rtol, atol=atol)
-        c2 = np.allclose(a.std(axis=0), b=1., rtol=rtol, atol=atol)
+        c1 = np.allclose(a.mean(axis=0), b=0.0, rtol=rtol, atol=atol)
+        c2 = np.allclose(a.std(axis=0), b=1.0, rtol=rtol, atol=atol)
         if c1 and c2:
             # TODO: maybe we want to just warn here?
-            raise ValueError('Data appears to be ~N(0,1).  Specify'
-                             ' use_constant=False.')
+            raise ValueError(
+                "Data appears to be ~N(0,1).  Specify" " use_constant=False."
+            )
         # `has_constant` does checking on its own and raises VE if True
         try:
-            a = add_constant(a, has_constant='raise')
+            a = add_constant(a, has_constant="raise")
         except ValueError as e:
             raise ValueError(
-                'X data already contains a constant; please specify'
-                ' has_const=True'
+                "X data already contains a constant; please specify"
+                " has_const=True"
             ) from e
         k = a.shape[-1] - 1
     else:
-        raise ValueError('`use_const` == False implies has_const is False.')
+        raise ValueError("`use_const` == False implies has_const is False.")
 
     return k, a
 
@@ -112,8 +120,7 @@ def _clean_xy(y, x=None, has_const=False, use_const=True):
         x = y[:, 1:]
         y = y[:, 0]
 
-    k, x = _check_constant_params(x, has_const=has_const,
-                                  use_const=use_const)
+    k, x = _check_constant_params(x, has_const=has_const, use_const=use_const)
     y = np.squeeze(y)
     if x.ndim == 1:
         x = x[:, None]
@@ -154,8 +161,9 @@ class OLS(object):
     """
 
     def __init__(self, y, x=None, has_const=False, use_const=True):
-        self.x, self.y, self.k = _clean_xy(y=y, x=x, has_const=has_const,
-                                           use_const=use_const)
+        self.x, self.y, self.k = _clean_xy(
+            y=y, x=x, has_const=has_const, use_const=use_const
+        )
         self.n = y.shape[0]
 
         # np.lstsq(a,b): Solves the equation a x = b by computing a vector x
@@ -205,7 +213,7 @@ class OLS(object):
 
     @property
     def durbin_watson(self):
-        return np.sum(np.diff(self.resids) ** 2.) / self.ss_err
+        return np.sum(np.diff(self.resids) ** 2.0) / self.ss_err
 
     @property
     def fstat(self):
@@ -215,7 +223,7 @@ class OLS(object):
     @property
     def fstat_sig(self):
         """p-value of the F-statistic."""
-        return 1. - scs.f.cdf(self.fstat, self.df_reg, self.df_err)
+        return 1.0 - scs.f.cdf(self.fstat, self.df_reg, self.df_err)
 
     @property
     def jarque_bera(self):
@@ -240,7 +248,7 @@ class OLS(object):
     @property
     def _pvalues_all(self):
         """Two-tailed p values for t-stats of all parameters."""
-        return 2. * (1. - scs.t.cdf(np.abs(self._tstat_all), self.df_err))
+        return 2.0 * (1.0 - scs.t.cdf(np.abs(self._tstat_all), self.df_err))
 
     @property
     def pvalue_alpha(self):
@@ -267,7 +275,7 @@ class OLS(object):
         """Adjusted R-squared."""
         n = self.n
         k = self.k
-        return 1. - ((1. - self.rsq) * (n - 1.) / (n - k - 1.))
+        return 1.0 - ((1.0 - self.rsq) * (n - 1.0) / (n - k - 1.0))
 
     @property
     def _se_all(self):
@@ -309,8 +317,7 @@ class OLS(object):
         For standard errors of parameters, see _se_all, se_alpha, and se_beta.
         """
 
-        return np.sqrt(np.sum(np.square(self.resids), axis=0)
-                       / self.df_err)
+        return np.sqrt(np.sum(np.square(self.resids), axis=0) / self.df_err)
 
     @property
     def _tstat_all(self):
@@ -368,10 +375,12 @@ class RollingOLS(object):
         constant equal to zero; specify use_const=False in this situation
     """
 
-    def __init__(self, y, x=None, window=None, has_const=False,
-                 use_const=True):
-        self.x, self.y, self.k = _clean_xy(y=y, x=x, has_const=has_const,
-                                           use_const=use_const)
+    def __init__(
+        self, y, x=None, window=None, has_const=False, use_const=True
+    ):
+        self.x, self.y, self.k = _clean_xy(
+            y=y, x=x, has_const=has_const, use_const=use_const
+        )
         self.window = self.n = window
         self.xwins = utils.rolling_windows(self.x, window=window)
         self.ywins = utils.rolling_windows(self.y, window=window)
@@ -414,15 +423,15 @@ class RollingOLS(object):
 
         For standard errors of parameters, see _se_all, se_alpha, and se_beta.
         """
-        return np.sqrt(np.sum(np.square(self._resids), axis=1)
-                       / self._df_err)
+        return np.sqrt(np.sum(np.square(self._resids), axis=1) / self._df_err)
 
     @property
     @lru_cache(maxsize=None)
     def _predicted(self):
         """The predicted values of y ('yhat')."""
-        return np.squeeze(np.matmul(self.xwins, np.expand_dims(self.solution,
-                                                               axis=-1)))
+        return np.squeeze(
+            np.matmul(self.xwins, np.expand_dims(self.solution, axis=-1))
+        )
 
     @property
     @lru_cache(maxsize=None)
@@ -435,8 +444,11 @@ class RollingOLS(object):
 
     @property
     def _durbin_watson(self):
-        return np.sum(np.square(np.diff(self._resids))
-                      / np.expand_dims(self._ss_err, axis=-1), axis=1)
+        return np.sum(
+            np.square(np.diff(self._resids))
+            / np.expand_dims(self._ss_err, axis=-1),
+            axis=1,
+        )
 
     @property
     @lru_cache(maxsize=None)
@@ -448,15 +460,18 @@ class RollingOLS(object):
     @lru_cache(maxsize=None)
     def _ss_tot(self):
         """Total sum of squares."""
-        return np.sum(np.square(self.ywins - np.expand_dims(self._ybar,
-                                                            axis=-1)), axis=1)
+        return np.sum(
+            np.square(self.ywins - np.expand_dims(self._ybar, axis=-1)), axis=1
+        )
 
     @property
     @lru_cache(maxsize=None)
     def _ss_reg(self):
         """Sum of squares of the regression."""
-        return np.sum(np.square(self._predicted
-                                - np.expand_dims(self._ybar, axis=1)), axis=1)
+        return np.sum(
+            np.square(self._predicted - np.expand_dims(self._ybar, axis=1)),
+            axis=1,
+        )
 
     @property
     @lru_cache(maxsize=None)
@@ -474,7 +489,7 @@ class RollingOLS(object):
         """Adjusted R-squared."""
         n = self.n
         k = self.k
-        return 1. - ((1. - self._rsq) * (n - 1.) / (n - k - 1.))
+        return 1.0 - ((1.0 - self._rsq) * (n - 1.0) / (n - k - 1.0))
 
     @property
     def _ms_err(self):
@@ -494,16 +509,18 @@ class RollingOLS(object):
     @property
     def _fstat_sig(self):
         """p-value of the F-statistic."""
-        return 1. - scs.f.cdf(self._fstat, self._df_reg, self._df_err)
+        return 1.0 - scs.f.cdf(self._fstat, self._df_reg, self._df_err)
 
     @property
     @lru_cache(maxsize=None)
     def _se_all(self):
         """Standard errors (SE) for all parameters, including the intercept."""
         err = np.expand_dims(self._ms_err, axis=1)
-        t1 = np.diagonal(np.linalg.inv(np.matmul(self.xwins.swapaxes(1, 2),
-                                                 self.xwins)),
-                         axis1=1, axis2=2)
+        t1 = np.diagonal(
+            np.linalg.inv(np.matmul(self.xwins.swapaxes(1, 2), self.xwins)),
+            axis1=1,
+            axis2=2,
+        )
         return np.squeeze(np.sqrt(t1 * err))
 
     @property
@@ -536,7 +553,7 @@ class RollingOLS(object):
     @lru_cache(maxsize=None)
     def _pvalues_all(self):
         """Two-tailed p values for t-stats of all parameters."""
-        return 2. * (1. - scs.t.cdf(np.abs(self._tstat_all), self._df_err))
+        return 2.0 * (1.0 - scs.t.cdf(np.abs(self._tstat_all), self._df_err))
 
     @property
     def _pvalue_alpha(self):
@@ -700,13 +717,20 @@ class RollingOLS(object):
 
 
 class PandasRollingOLS(RollingOLS):
-    def __init__(self, y, x=None, window=None, has_const=False, use_const=True,
-                 names=None):
+    def __init__(
+        self,
+        y,
+        x=None,
+        window=None,
+        has_const=False,
+        use_const=True,
+        names=None,
+    ):
 
         # A little redundant needing to establish k...
         if not names:
             if x is None:
-                if hasattr(y, 'columns'):
+                if hasattr(y, "columns"):
                     if has_const:
                         names = y.columns[1:-1]
                     else:
@@ -716,9 +740,9 @@ class PandasRollingOLS(RollingOLS):
                         k = y.shape[-1] - 2
                     else:
                         k = y.shape[-1] - 1
-                    names = ['feature{}'.format(i) for i in range(1, k+1)]
+                    names = ["feature{}".format(i) for i in range(1, k + 1)]
             else:
-                if hasattr(x, 'columns'):
+                if hasattr(x, "columns"):
                     if has_const:
                         names = x.columns[:-1]
                     else:
@@ -731,16 +755,16 @@ class PandasRollingOLS(RollingOLS):
                             k = 1
                         else:
                             k = x.shape[-1]
-                    names = ['feature{}'.format(i) for i in range(1, k+1)]
+                    names = ["feature{}".format(i) for i in range(1, k + 1)]
         self.names = names
 
-        super(PandasRollingOLS, self).__init__(y=y, x=x, window=window,
-                                               has_const=has_const,
-                                               use_const=use_const)
+        super(PandasRollingOLS, self).__init__(
+            y=y, x=x, window=window, has_const=has_const, use_const=use_const
+        )
 
         self.index = y.index
         # Index for the rolling result starts at (window - 1)
-        self.ridx = y.index[window-1:]
+        self.ridx = y.index[window - 1 :]
 
     def _wrap_series(self, stat, name=None):
         if name is None:
@@ -748,25 +772,28 @@ class PandasRollingOLS(RollingOLS):
         return Series(getattr(self, stat), index=self.ridx, name=name)
 
     def _wrap_dataframe(self, stat):
-        return DataFrame(getattr(self, stat), index=self.ridx,
-                         columns=self.names)
+        return DataFrame(
+            getattr(self, stat), index=self.ridx, columns=self.names
+        )
 
     def _wrap_multidx(self, stat, name=None):
         if name is None:
             name = stat[1:]
         outer = np.repeat(self.ridx, self.window)
-        inner = np.ravel(utils.rolling_windows(self.index.values,
-                                               window=self.window))
-        return Series(getattr(self, stat).flatten(), index=[outer, inner],
-                      name=name).rename_axis(['end', 'subperiod'])
+        inner = np.ravel(
+            utils.rolling_windows(self.index.values, window=self.window)
+        )
+        return Series(
+            getattr(self, stat).flatten(), index=[outer, inner], name=name
+        ).rename_axis(["end", "subperiod"])
 
     @property
     def alpha(self):
-        return self._wrap_series(stat='_alpha', name='intercept')
+        return self._wrap_series(stat="_alpha", name="intercept")
 
     @property
     def beta(self):
-        return self._wrap_dataframe(stat='_beta')
+        return self._wrap_dataframe(stat="_beta")
 
     # df_tot, df_reg, df_err are scalars; no override.
 
@@ -776,106 +803,106 @@ class PandasRollingOLS(RollingOLS):
 
         For standard errors of parameters, see _se_all, se_alpha, and se_beta.
         """
-        return self._wrap_series(stat='_std_err')
+        return self._wrap_series(stat="_std_err")
 
     @property
     def predicted(self):
         """The predicted values of y ('yhat')."""
-        return self._wrap_multidx('_predicted')
+        return self._wrap_multidx("_predicted")
 
     @property
     def resids(self):
-        return self._wrap_multidx('_resids')
+        return self._wrap_multidx("_resids")
 
     @property
     def jarque_bera(self):
-        return self._wrap_series(stat='_jarque_bera')
+        return self._wrap_series(stat="_jarque_bera")
 
     @property
     def durbin_watson(self):
-        return self._wrap_series(stat='_durbin_watson')
+        return self._wrap_series(stat="_durbin_watson")
 
     @property
     def ybar(self):
         """The mean of y."""
-        return self._wrap_series(stat='_ybar')
+        return self._wrap_series(stat="_ybar")
 
     @property
     def ss_tot(self):
         """Total sum of squares."""
-        return self._wrap_series(stat='_ss_tot')
+        return self._wrap_series(stat="_ss_tot")
 
     @property
     def ss_reg(self):
         """Sum of squares of the regression."""
-        return self._wrap_series(stat='_ss_reg')
+        return self._wrap_series(stat="_ss_reg")
 
     @property
     def ss_err(self):
         """Sum of squares of the residuals (error sum of squares)."""
-        return self._wrap_series(stat='_ss_err')
+        return self._wrap_series(stat="_ss_err")
 
     @property
     def rsq(self):
         """The coefficent of determination, R-squared."""
-        return self._wrap_series(stat='_rsq')
+        return self._wrap_series(stat="_rsq")
 
     @property
     def rsq_adj(self):
         """Adjusted R-squared."""
-        return self._wrap_series(stat='_rsq_adj')
+        return self._wrap_series(stat="_rsq_adj")
 
     @property
     def ms_err(self):
         """Mean squared error the errors (residuals)."""
-        return self._wrap_series(stat='_ms_err')
+        return self._wrap_series(stat="_ms_err")
 
     @property
     def ms_reg(self):
         """Mean squared error the regression (model)."""
-        return self._wrap_series(stat='_ms_reg')
+        return self._wrap_series(stat="_ms_reg")
 
     @property
     def fstat(self):
         """F-statistic of the fully specified model."""
-        return self._wrap_series(stat='_fstat')
+        return self._wrap_series(stat="_fstat")
 
     @property
     def fstat_sig(self):
         """p-value of the F-statistic."""
-        return self._wrap_series(stat='_fstat_sig')
+        return self._wrap_series(stat="_fstat_sig")
 
     @property
     def se_alpha(self):
         """Standard errors (SE) of the intercept (alpha) only."""
-        return self._wrap_series(stat='_se_alpha')
+        return self._wrap_series(stat="_se_alpha")
 
     @property
     def se_beta(self):
         """Standard errors (SE) of the parameters, excluding the intercept."""
-        return self._wrap_dataframe(stat='_se_beta')
+        return self._wrap_dataframe(stat="_se_beta")
 
     @property
     def tstat_alpha(self):
         """The t-statistic of the intercept (alpha)."""
-        return self._wrap_series(stat='_tstat_alpha')
+        return self._wrap_series(stat="_tstat_alpha")
 
     @property
     def tstat_beta(self):
         """The t-statistics of the parameters, excl. the intecept."""
-        return self._wrap_dataframe(stat='_tstat_beta')
+        return self._wrap_dataframe(stat="_tstat_beta")
 
     @property
     def pvalue_alpha(self):
         """Two-tailed p values for t-stats of the intercept only."""
-        return self._wrap_series(stat='_pvalue_alpha')
+        return self._wrap_series(stat="_pvalue_alpha")
 
     @property
     def pvalue_beta(self):
         """Two-tailed p values for t-stats of parameters, excl. intercept."""
-        return self._wrap_dataframe(stat='_pvalue_beta')
+        return self._wrap_dataframe(stat="_pvalue_beta")
 
     @property
     def condition_number(self):
         """Condition number of x; ratio of largest to smallest eigenvalue."""
-        return self._wrap_series(stat='_condition_number')
+        return self._wrap_series(stat="_condition_number")

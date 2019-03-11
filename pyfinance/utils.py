@@ -39,14 +39,26 @@ view
     Abbreviated view similar to .head, but limit both rows & columns.
 """
 
-__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
+__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
 __all__ = [
-    'appender', 'avail', 'can_broadcast', 'constrain',
-    'constrain_horizon', 'dropcols', 'encode', 'equal_weights',
-    'expanding_stdize', 'isiterable', 'public_dir',
-    'random_tickers', 'random_weights', 'rolling_windows', 'view',
-    'unique_everseen', 'uniqify'
-    ]
+    "appender",
+    "avail",
+    "can_broadcast",
+    "constrain",
+    "constrain_horizon",
+    "dropcols",
+    "encode",
+    "equal_weights",
+    "expanding_stdize",
+    "isiterable",
+    "public_dir",
+    "random_tickers",
+    "random_weights",
+    "rolling_windows",
+    "view",
+    "unique_everseen",
+    "uniqify",
+]
 
 from collections import Callable
 import inspect
@@ -61,6 +73,7 @@ import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame
 from pandas.tseries import offsets
+
 try:
     from pandas.tseries.frequencies import FreqGroup, get_freq_code
 except ImportError:  # 0.24+, or somewhere around then
@@ -106,10 +119,14 @@ def appender(defaultdocs, passed_to=None):
     def _doc(func):
         params = inspect.signature(func).parameters
         params = [param.name for param in params.values()]
-        msg = '\n**kwargs : passed to `%s`'
-        params = ''.join([textwrap.dedent(defaultdocs.get(
-            param, msg % passed_to)) for param in params])
-        func.__doc__ += '\n\nParameters\n' + 10 * '=' + params
+        msg = "\n**kwargs : passed to `%s`"
+        params = "".join(
+            [
+                textwrap.dedent(defaultdocs.get(param, msg % passed_to))
+                for param in params
+            ]
+        )
+        func.__doc__ += "\n\nParameters\n" + 10 * "=" + params
         return func
 
     return _doc
@@ -117,11 +134,13 @@ def appender(defaultdocs, passed_to=None):
 
 def avail(df):
     """Return start & end availability for each column in a DataFrame."""
-    avail = DataFrame({
-        'start': df.apply(lambda col: col.first_valid_index()),
-        'end': df.apply(lambda col: col.last_valid_index())
-                     })
-    return avail[['start', 'end']]
+    avail = DataFrame(
+        {
+            "start": df.apply(lambda col: col.first_valid_index()),
+            "end": df.apply(lambda col: col.last_valid_index()),
+        }
+    )
+    return avail[["start", "end"]]
 
 
 def can_broadcast(*args):
@@ -158,9 +177,19 @@ def constrain(*objs):
     return tuple(new_dfs)
 
 
-def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
-                      months=0, days=0, weeks=0,  year=None, month=None,
-                      day=None):
+def constrain_horizon(
+    r,
+    strict=False,
+    cust=None,
+    years=0,
+    quarters=0,
+    months=0,
+    days=0,
+    weeks=0,
+    year=None,
+    month=None,
+    day=None,
+):
 
     """Constrain a Series/DataFrame to a specified lookback period.
 
@@ -191,54 +220,56 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
     """
 
     textnum = {
-        'zero': 0,
-        'one': 1,
-        'two': 2,
-        'three': 3,
-        'four': 4,
-        'five': 5,
-        'six': 6,
-        'seven': 7,
-        'eight': 8,
-        'nine': 9,
-        'ten': 10,
-        'eleven': 11,
-        'twelve': 12,
-        'thirteen': 13,
-        'fourteen': 14,
-        'fifteen': 15,
-        'sixteen': 16,
-        'seventeen': 17,
-        'eighteen': 18,
-        'nineteen': 19,
-        'twenty': 20,
-        'twenty four': 24,
-        'thirty six': 36,
-        }
+        "zero": 0,
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+        "eleven": 11,
+        "twelve": 12,
+        "thirteen": 13,
+        "fourteen": 14,
+        "fifteen": 15,
+        "sixteen": 16,
+        "seventeen": 17,
+        "eighteen": 18,
+        "nineteen": 19,
+        "twenty": 20,
+        "twenty four": 24,
+        "thirty six": 36,
+    }
 
     relativedeltas = years, quarters, months, days, weeks, year, month, day
     if cust is not None and any(relativedeltas):
-        raise ValueError('Cannot specify competing (nonzero) values for both'
-                         ' `cust` and other parameters.')
+        raise ValueError(
+            "Cannot specify competing (nonzero) values for both"
+            " `cust` and other parameters."
+        )
     if cust is not None:
         cust = cust.lower()
 
-        if cust.endswith('y'):
-            years = int(re.search(r'\d+', cust).group(0))
+        if cust.endswith("y"):
+            years = int(re.search(r"\d+", cust).group(0))
 
-        elif cust.endswith('m'):
-            months = int(re.search(r'\d+', cust).group(0))
+        elif cust.endswith("m"):
+            months = int(re.search(r"\d+", cust).group(0))
 
-        elif cust.endswith(('years ago', 'year ago', 'year', 'years')):
-            pos = cust.find(' year')
-            years = textnum[cust[:pos].replace('-', '')]
+        elif cust.endswith(("years ago", "year ago", "year", "years")):
+            pos = cust.find(" year")
+            years = textnum[cust[:pos].replace("-", "")]
 
-        elif cust.endswith(('months ago', 'month ago', 'month', 'months')):
-            pos = cust.find(' month')
-            months = textnum[cust[:pos].replace('-', '')]
+        elif cust.endswith(("months ago", "month ago", "month", "months")):
+            pos = cust.find(" month")
+            months = textnum[cust[:pos].replace("-", "")]
 
         else:
-            raise ValueError('`cust` not recognized.')
+            raise ValueError("`cust` not recognized.")
 
     # Convert quarters to months & combine for MonthOffset
     months += quarters * 3
@@ -256,12 +287,19 @@ def constrain_horizon(r, strict=False, cust=None, years=0, quarters=0,
             months += years
         start = end - offsets.MonthBegin(months)
     else:
-        start = end - offsets.DateOffset(years=years, months=months,
-                                         days=days-1, weeks=weeks, year=year,
-                                         month=month, day=day)
+        start = end - offsets.DateOffset(
+            years=years,
+            months=months,
+            days=days - 1,
+            weeks=weeks,
+            year=year,
+            month=month,
+            day=day,
+        )
     if strict and start < r.index[0]:
-        raise ValueError('`start` pre-dates first element of the Index, %s'
-                         % r.index[0])
+        raise ValueError(
+            "`start` pre-dates first element of the Index, %s" % r.index[0]
+        )
     return r[start:end]
 
 
@@ -332,7 +370,7 @@ def dropcols(df, start=None, end=None):
     """
 
     if isinstance(df, Series):
-        raise ValueError('func only applies to `pd.DataFrame`')
+        raise ValueError("func only applies to `pd.DataFrame`")
     if start is None:
         start = df.index[0]
     if end is None:
@@ -370,7 +408,7 @@ def dropout(a, p=0.5, inplace=False):
         # Can't pass float dtype to `randint` directly.
         rand = np.random.randint(0, high=2, size=a.shape).astype(dtype=dt)
     else:
-        rand = np.random.choice([0, 1], p=[p, 1-p], size=a.shape).astype(dt)
+        rand = np.random.choice([0, 1], p=[p, 1 - p], size=a.shape).astype(dt)
     if inplace:
         a *= rand
     else:
@@ -399,7 +437,7 @@ def encode(*args):
     return feature_vectors
 
 
-def equal_weights(n, sumto=1.):
+def equal_weights(n, sumto=1.0):
     """Generate `n` equal weights (decimals) summing to `sumto`.
 
     Note that sum is subject to typical Python floating point limitations.
@@ -440,8 +478,9 @@ def expanding_stdize(obj, **kwargs):
     9  0.15280 -0.73283 -0.84907
     """
 
-    return (obj - obj.expanding(**kwargs).mean())\
-        / (obj.expanding(**kwargs).std())
+    return (obj - obj.expanding(**kwargs).mean()) / (
+        obj.expanding(**kwargs).std()
+    )
 
 
 # Annualization factors.  The keys are multiples of 1000
@@ -450,19 +489,19 @@ def expanding_stdize(obj, **kwargs):
 # there are 251 NYSE trading days in 2017, 252 in 2016 & 2018.
 
 PERIODS_PER_YEAR = {
-    FreqGroup.FR_ANN: 1.,
-    FreqGroup.FR_QTR: 4.,
-    FreqGroup.FR_MTH: 12.,
-    FreqGroup.FR_WK: 52.,
-    FreqGroup.FR_BUS: 252.,
-    FreqGroup.FR_DAY: 252.,  # All days are business days
-    FreqGroup.FR_HR: 252. * 6.5,
-    FreqGroup.FR_MIN: 252. * 6.5 * 60,
-    FreqGroup.FR_SEC: 252. * 6.5 * 60 * 60,
-    FreqGroup.FR_MS: 252. * 6.5 * 60 * 60,
-    FreqGroup.FR_US: 252. * 6.5 * 60 * 60 * 1000,
-    FreqGroup.FR_NS: 252. * 6.5 * 60 * 60 * 1000 * 1000  # someday...
-    }
+    FreqGroup.FR_ANN: 1.0,
+    FreqGroup.FR_QTR: 4.0,
+    FreqGroup.FR_MTH: 12.0,
+    FreqGroup.FR_WK: 52.0,
+    FreqGroup.FR_BUS: 252.0,
+    FreqGroup.FR_DAY: 252.0,  # All days are business days
+    FreqGroup.FR_HR: 252.0 * 6.5,
+    FreqGroup.FR_MIN: 252.0 * 6.5 * 60,
+    FreqGroup.FR_SEC: 252.0 * 6.5 * 60 * 60,
+    FreqGroup.FR_MS: 252.0 * 6.5 * 60 * 60,
+    FreqGroup.FR_US: 252.0 * 6.5 * 60 * 60 * 1000,
+    FreqGroup.FR_NS: 252.0 * 6.5 * 60 * 60 * 1000 * 1000,  # someday...
+}
 
 
 def get_anlz_factor(freq):
@@ -499,14 +538,14 @@ def get_anlz_factor(freq):
         # The above will fail for a bunch of irregular frequencies, such
         # as 'Q-NOV' or 'BQS-APR'
         freq = freq.upper()
-        if freq.startswith(('A-', 'BA-', 'AS-', 'BAS-')):
-            freq = 'A'
-        elif freq.startswith(('Q-', 'BQ-', 'QS-', 'BQS-')):
-            freq = 'Q'
-        elif freq in {'MS', 'BMS'}:
-            freq = 'M'
+        if freq.startswith(("A-", "BA-", "AS-", "BAS-")):
+            freq = "A"
+        elif freq.startswith(("Q-", "BQ-", "QS-", "BQS-")):
+            freq = "Q"
+        elif freq in {"MS", "BMS"}:
+            freq = "M"
         else:
-            raise ValueError('Invalid frequency: %s' % freq)
+            raise ValueError("Invalid frequency: %s" % freq)
         base, mult = get_freq_code(freq)
     return PERIODS_PER_YEAR[(base // 1000) * 1000] / mult
 
@@ -550,16 +589,20 @@ def public_dir(obj, max_underscores=0, type_=None):
     """
 
     if max_underscores > 0:
-        cond1 = lambda i: not i.startswith('_' * max_underscores)  # noqa
+        cond1 = lambda i: not i.startswith("_" * max_underscores)  # noqa
     else:
         cond1 = lambda i: True  # noqa
     if type_:
         if isinstance(type_, str):
-            if type_ in ['callable', 'func', 'function']:
+            if type_ in ["callable", "func", "function"]:
                 type_ = Callable
-            elif 'callable' in type_ or 'func' in type_:
-                type_ = [i if i not in ['callable', 'func', 'function']
-                         else Callable for i in type_]
+            elif "callable" in type_ or "func" in type_:
+                type_ = [
+                    i
+                    if i not in ["callable", "func", "function"]
+                    else Callable
+                    for i in type_
+                ]
         if isinstance(type_, str):
             # 'str' --> str (class `type`)
             type_ = eval(type_)
@@ -572,8 +615,9 @@ def public_dir(obj, max_underscores=0, type_=None):
     return [i for i in dir(obj) if cond1(i) and cond2(i)]
 
 
-def random_tickers(length, n_tickers, endswith=None, letters=None,
-                   slicer=itertools.islice):
+def random_tickers(
+    length, n_tickers, endswith=None, letters=None, slicer=itertools.islice
+):
     """Generate a length-n_tickers list of unique random ticker symbols.
 
     Parameters
@@ -612,7 +656,7 @@ def random_tickers(length, n_tickers, endswith=None, letters=None,
     if endswith:
         # Only generate substrings up to `endswith`
         length = length - len(endswith)
-    join = ''.join
+    join = "".join
 
     def yield_ticker(rand=random.choices):
         if endswith:
@@ -626,7 +670,7 @@ def random_tickers(length, n_tickers, endswith=None, letters=None,
     return list(tickers)
 
 
-def random_weights(size, sumto=1.):
+def random_weights(size, sumto=1.0):
     """Generate an array of random weights that sum to `sumto`.
 
     The result may be of arbitrary dimensions.  `size` is passed to
@@ -657,7 +701,7 @@ def random_weights(size, sumto=1.):
     elif w.ndim == 1:
         w = sumto * w / w.sum()
     else:
-        raise ValueError('`w.ndim` must be 1 or 2, not %s' % w.ndim)
+        raise ValueError("`w.ndim` must be 1 or 2, not %s" % w.ndim)
     return w
 
 
@@ -701,16 +745,19 @@ def rolling_windows(a, window):
     """
 
     if window > a.shape[0]:
-        raise ValueError('Specified `window` length of {0} exceeds length of'
-                         ' `a`, {1}.'.format(window, a.shape[0]))
+        raise ValueError(
+            "Specified `window` length of {0} exceeds length of"
+            " `a`, {1}.".format(window, a.shape[0])
+        )
     if isinstance(a, (Series, DataFrame)):
         a = a.values
     if a.ndim == 1:
         a = a.reshape(-1, 1)
     shape = (a.shape[0] - window + 1, window) + a.shape[1:]
     strides = (a.strides[0],) + a.strides
-    windows = np.squeeze(np.lib.stride_tricks.as_strided(a, shape=shape,
-                                                         strides=strides))
+    windows = np.squeeze(
+        np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
+    )
     # In cases where window == len(a), we actually want to "unsqueeze" to 2d.
     #     I.e., we still want a "windowed" structure with 1 window.
     if windows.ndim == 1:

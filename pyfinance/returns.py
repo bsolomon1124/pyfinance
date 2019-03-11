@@ -21,20 +21,22 @@ is strictly preferrable to composition or piping.
     https://pandas.pydata.org/pandas-docs/stable/internals.html
 """
 
-__all__ = ['TSeries', 'TFrame']
-__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
+__all__ = ["TSeries", "TFrame"]
+__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
 
 import copy
 from numbers import Number
 
 import numpy as np
-from numpy.lib.nanfunctions import (nanmin,
-                                    nansum,
-                                    nanprod,
-                                    nancumsum,
-                                    nancumprod,
-                                    nanmean,
-                                    nanstd)
+from numpy.lib.nanfunctions import (
+    nanmin,
+    nansum,
+    nanprod,
+    nancumsum,
+    nancumprod,
+    nanmean,
+    nanstd,
+)
 import pandas as pd
 
 from pyfinance import ols, utils
@@ -48,7 +50,7 @@ class TSeries(pd.Series):
 
     def __init__(self, *args, **kwargs):
         args = tuple(copy.deepcopy(arg) for arg in args)
-        freq = kwargs.pop('freq', None)
+        freq = kwargs.pop("freq", None)
         super().__init__(*args, **kwargs)
         self.freq = freq
 
@@ -58,7 +60,7 @@ class TSeries(pd.Series):
         # (with __repr__, for instance).
 
         if not self.index.is_monotonic_increasing:
-            raise FrequencyError('Input Index should be sorted.')
+            raise FrequencyError("Input Index should be sorted.")
 
     @property
     def _constructor(self):
@@ -130,11 +132,13 @@ class TSeries(pd.Series):
             # We do, however, need an explicit frequency.
             freq = freq if freq is not None else self.freq
             if freq is None:
-                raise FrequencyError('Must specify a `freq` when a'
-                                     ' datetime-like index is not used.')
+                raise FrequencyError(
+                    "Must specify a `freq` when a"
+                    " datetime-like index is not used."
+                )
 
             n = len(self) / utils.get_anlz_factor(freq)
-        return nanprod(self.ret_rels()) ** (1. / n) - 1.
+        return nanprod(self.ret_rels()) ** (1.0 / n) - 1.0
 
     def anlzd_stdev(self, ddof=0, freq=None, **kwargs):
         """Annualized standard deviation with `ddof` degrees of freedom.
@@ -181,7 +185,7 @@ class TSeries(pd.Series):
         """
 
         diff = self.excess_ret(benchmark)
-        return np.count_nonzero(diff > 0.) / diff.count()
+        return np.count_nonzero(diff > 0.0) / diff.count()
 
     def beta(self, benchmark, **kwargs):
         """CAPM beta.
@@ -206,7 +210,7 @@ class TSeries(pd.Series):
 
         return self.CAPM(benchmark, **kwargs).beta
 
-    def beta_adj(self, benchmark, adj_factor=2/3, **kwargs):
+    def beta_adj(self, benchmark, adj_factor=2 / 3, **kwargs):
         """Adjusted beta.
 
         Beta that is adjusted to reflect the tendency of beta to
@@ -251,7 +255,7 @@ class TSeries(pd.Series):
 
         return self.anlzd_ret() / np.abs(self.max_drawdown())
 
-    def capture_ratio(self, benchmark, threshold=0., compare_op=('ge', 'lt')):
+    def capture_ratio(self, benchmark, threshold=0.0, compare_op=("ge", "lt")):
         """Capture ratio--ratio of upside to downside capture.
 
         Upside capture ratio divided by the downside capture ratio.
@@ -280,10 +284,12 @@ class TSeries(pd.Series):
             op1, op2 = compare_op
         else:
             op1, op2 = compare_op, compare_op
-        uc = self.up_capture(benchmark=benchmark, threshold=threshold,
-                             compare_op=op1)
-        dc = self.down_capture(benchmark=benchmark, threshold=threshold,
-                               compare_op=op2)
+        uc = self.up_capture(
+            benchmark=benchmark, threshold=threshold, compare_op=op1
+        )
+        dc = self.down_capture(
+            benchmark=benchmark, threshold=threshold, compare_op=op2
+        )
         return uc / dc
 
     def cuml_ret(self):
@@ -294,7 +300,7 @@ class TSeries(pd.Series):
         float
         """
 
-        return self.growth_of_x() - 1.
+        return self.growth_of_x() - 1.0
 
     def cuml_idx(self):
         """Cumulative return index--a TSeries of cumulative returns.
@@ -304,9 +310,9 @@ class TSeries(pd.Series):
         TSeries
         """
 
-        return self.ret_idx() - 1.
+        return self.ret_idx() - 1.0
 
-    def down_capture(self, benchmark, threshold=0., compare_op='lt'):
+    def down_capture(self, benchmark, threshold=0.0, compare_op="lt"):
         """Downside capture ratio.
 
         Measures the performance of `self` relative to benchmark
@@ -339,14 +345,21 @@ class TSeries(pd.Series):
         This metric uses geometric, not arithmetic, mean return.
         """
 
-        slf, bm = self.downmarket_filter(benchmark=benchmark,
-                                         threshold=threshold,
-                                         compare_op=compare_op,
-                                         include_benchmark=True)
+        slf, bm = self.downmarket_filter(
+            benchmark=benchmark,
+            threshold=threshold,
+            compare_op=compare_op,
+            include_benchmark=True,
+        )
         return slf.geomean() / bm.geomean()
 
-    def downmarket_filter(self, benchmark, threshold=0., compare_op='lt',
-                          include_benchmark=False):
+    def downmarket_filter(
+        self,
+        benchmark,
+        threshold=0.0,
+        compare_op="lt",
+        include_benchmark=False,
+    ):
         """Drop elementwise samples where `benchmark` > `threshold`.
 
         Filters `self` (and optionally, `benchmark`) to periods
@@ -373,9 +386,12 @@ class TSeries(pd.Series):
             TSeries if `include_benchmark=False`, otherwise, tuple.
         """
 
-        return self._mkt_filter(benchmark=benchmark, threshold=threshold,
-                                compare_op=compare_op,
-                                include_benchmark=include_benchmark)
+        return self._mkt_filter(
+            benchmark=benchmark,
+            threshold=threshold,
+            compare_op=compare_op,
+            include_benchmark=include_benchmark,
+        )
 
     def drawdown_end(self, return_date=False):
         """The date of the drawdown trough.
@@ -407,7 +423,7 @@ class TSeries(pd.Series):
         """
 
         ri = self.ret_idx()
-        return ri / np.maximum(ri.cummax(), 1.) - 1.
+        return ri / np.maximum(ri.cummax(), 1.0) - 1.0
 
     def drawdown_length(self, return_int=False):
         """Length of drawdown in days.
@@ -474,7 +490,7 @@ class TSeries(pd.Series):
             return start.date()
         return start
 
-    def excess_drawdown_idx(self, benchmark, method='caer'):
+    def excess_drawdown_idx(self, benchmark, method="caer"):
         """Excess drawdown index; TSeries of excess drawdowns.
 
         There are several ways of computing this metric.  For highly
@@ -491,25 +507,25 @@ class TSeries(pd.Series):
 
         # TODO: plot these (compared) in docs.
         if isinstance(method, (int, float)):
-            method = ['caer', 'cger', 'ecr', 'ecrr'][method]
+            method = ["caer", "cger", "ecr", "ecrr"][method]
         method = method.lower()
 
-        if method == 'caer':
-            er = self.excess_ret(benchmark=benchmark, method='arithmetic')
+        if method == "caer":
+            er = self.excess_ret(benchmark=benchmark, method="arithmetic")
             return er.drawdown_idx()
 
-        elif method == 'cger':
-            er = self.excess_ret(benchmark=benchmark, method='geometric')
+        elif method == "cger":
+            er = self.excess_ret(benchmark=benchmark, method="geometric")
             return er.drawdown_idx()
 
-        elif method == 'ecr':
+        elif method == "ecr":
             er = self.ret_idx() - benchmark.ret_idx() + 1
             if er.isnull().any():
-                return er / er.cummax() - 1.
+                return er / er.cummax() - 1.0
             else:
-                return er / np.maximum.accumulate(er) - 1.
+                return er / np.maximum.accumulate(er) - 1.0
 
-        elif method == 'ecrr':
+        elif method == "ecrr":
             # Credit to: SO @piRSquared
             # https://stackoverflow.com/a/36848867/7954504
             p = self.ret_idx().values
@@ -517,8 +533,7 @@ class TSeries(pd.Series):
             er = p - b
             if er.isnull().any():
                 # The slower route but NaN-friendly.
-                cam = self.expanding(min_periods=1).apply(
-                    lambda x: x.argmax())
+                cam = self.expanding(min_periods=1).apply(lambda x: x.argmax())
             else:
                 cam = utils.cumargmax(er)
             p0 = p[cam]
@@ -526,13 +541,15 @@ class TSeries(pd.Series):
             return (p * b0 - b * p0) / (p0 * b0)
 
         else:
-            raise ValueError("`method` must be one of"
-                             " ('caer', 'cger', 'ecr', 'ecrr'),"
-                             " case-insensitive, or"
-                             " an integer mapping to these methods"
-                             " (1 thru 4).")
+            raise ValueError(
+                "`method` must be one of"
+                " ('caer', 'cger', 'ecr', 'ecrr'),"
+                " case-insensitive, or"
+                " an integer mapping to these methods"
+                " (1 thru 4)."
+            )
 
-    def excess_ret(self, benchmark, method='arithmetic'):
+    def excess_ret(self, benchmark, method="arithmetic"):
         """Excess return.
 
         Parameters
@@ -556,12 +573,14 @@ class TSeries(pd.Series):
             https://www.cfapubs.org/doi/full/10.2469/dig.v33.n1.1235
         """
 
-        if method.startswith('arith'):
+        if method.startswith("arith"):
             return self - _try_to_squeeze(benchmark)
-        elif method.startswith('geo'):
+        elif method.startswith("geo"):
             # Geometric excess return,
             # (1 + `self`) / (1 + `benchmark`) - 1.
-            return self.ret_rels() / _try_to_squeeze(benchmark).ret_rels() - 1.
+            return (
+                self.ret_rels() / _try_to_squeeze(benchmark).ret_rels() - 1.0
+            )
 
     def gain_to_loss_ratio(self):
         """Gain-to-loss ratio, ratio of positive to negative returns.
@@ -587,9 +606,9 @@ class TSeries(pd.Series):
         float
         """
 
-        return nanprod(self.ret_rels()) ** (1. / self.count()) - 1.
+        return nanprod(self.ret_rels()) ** (1.0 / self.count()) - 1.0
 
-    def growth_of_x(self, x=1.):
+    def growth_of_x(self, x=1.0):
         """Ending value from growth of `x`, a scalar.
 
         Returns
@@ -665,7 +684,7 @@ class TSeries(pd.Series):
         diff = self.anlzd_ret() - rf
         return rf + diff * scaling
 
-    def pct_negative(self, threshold=0.):
+    def pct_negative(self, threshold=0.0):
         """Pct. of periods in which `self` is less than `threshold.`
 
         Parameters
@@ -679,7 +698,7 @@ class TSeries(pd.Series):
 
         return np.count_nonzero(self[self < threshold]) / self.count()
 
-    def pct_positive(self, threshold=0.):
+    def pct_positive(self, threshold=0.0):
         """Pct. of periods in which `self` is greater than `threshold.`
 
         Parameters
@@ -726,7 +745,7 @@ class TSeries(pd.Series):
             return recov.date()
         return recov
 
-    def ret_idx(self, base=1.):
+    def ret_idx(self, base=1.0):
         """Return index, a time series starting at `base`.
 
         Parameters
@@ -750,7 +769,7 @@ class TSeries(pd.Series):
         -------
         TSeries
         """
-        return self + 1.
+        return self + 1.0
 
     def rollup(self, freq, **kwargs):
         """Downsample `self` through geometric linking.
@@ -782,7 +801,7 @@ class TSeries(pd.Series):
         Freq: Q-DEC, dtype: float64
         """
 
-        return self.ret_rels().resample(freq, **kwargs).prod() - 1.
+        return self.ret_rels().resample(freq, **kwargs).prod() - 1.0
 
     def rsq(self, benchmark, **kwargs):
         """R-squared.
@@ -825,7 +844,7 @@ class TSeries(pd.Series):
         """
         return self.CAPM(benchmark, **kwargs).rsq_adj
 
-    def semi_stdev(self, threshold=0., ddof=0, freq=None):
+    def semi_stdev(self, threshold=0.0, ddof=0, freq=None):
         """Semi-standard deviation; stdev of downside returns.
 
         It is designed to address that fact that plain standard
@@ -864,7 +883,7 @@ class TSeries(pd.Series):
             if freq is None:
                 raise FrequencyError(msg)
         n = self.count() - ddof
-        ss = (nansum(np.minimum(self - threshold, 0.) ** 2) ** 0.5) / n
+        ss = (nansum(np.minimum(self - threshold, 0.0) ** 2) ** 0.5) / n
         return ss * freq ** 0.5
 
     def sharpe_ratio(self, rf=0.02, ddof=0):
@@ -897,7 +916,7 @@ class TSeries(pd.Series):
         stdev = self.anlzd_stdev(ddof=ddof)
         return (self.anlzd_ret() - rf) / stdev
 
-    def sortino_ratio(self, threshold=0., ddof=0, freq=None):
+    def sortino_ratio(self, threshold=0.0, ddof=0, freq=None):
         """Return over a threshold per unit of downside deviation.
 
         A performance appraisal ratio that replaces standard deviation
@@ -982,7 +1001,7 @@ class TSeries(pd.Series):
 
         benchmark = _try_to_squeeze(benchmark)
         if benchmark.ndim > 1:
-            raise ValueError('Treynor ratio requires a single benchmark')
+            raise ValueError("Treynor ratio requires a single benchmark")
         rf = self._validate_rf(rf)
         beta = self.beta(benchmark)
         return (self.anlzd_ret() - rf) / beta
@@ -1043,7 +1062,7 @@ class TSeries(pd.Series):
 
         return nanmean(self.drawdown_idx() ** 2) ** 0.5
 
-    def up_capture(self, benchmark, threshold=0., compare_op='ge'):
+    def up_capture(self, benchmark, threshold=0.0, compare_op="ge"):
         """Upside capture ratio.
 
         Measures the performance of `self` relative to benchmark
@@ -1076,14 +1095,21 @@ class TSeries(pd.Series):
         This metric uses geometric, not arithmetic, mean return.
         """
 
-        slf, bm = self.upmarket_filter(benchmark=benchmark,
-                                       threshold=threshold,
-                                       compare_op=compare_op,
-                                       include_benchmark=True)
+        slf, bm = self.upmarket_filter(
+            benchmark=benchmark,
+            threshold=threshold,
+            compare_op=compare_op,
+            include_benchmark=True,
+        )
         return slf.geomean() / bm.geomean()
 
-    def upmarket_filter(self, benchmark, threshold=0., compare_op='ge',
-                        include_benchmark=False):
+    def upmarket_filter(
+        self,
+        benchmark,
+        threshold=0.0,
+        compare_op="ge",
+        include_benchmark=False,
+    ):
         """Drop elementwise samples where `benchmark` < `threshold`.
 
         Filters `self` (and optionally, `benchmark`) to periods
@@ -1110,9 +1136,12 @@ class TSeries(pd.Series):
             TSeries if `include_benchmark=False`, otherwise, tuple.
         """
 
-        return self._mkt_filter(benchmark=benchmark, threshold=threshold,
-                                compare_op=compare_op,
-                                include_benchmark=include_benchmark)
+        return self._mkt_filter(
+            benchmark=benchmark,
+            threshold=threshold,
+            compare_op=compare_op,
+            include_benchmark=include_benchmark,
+        )
 
     # Unfortunately, we can't cache this result because the input
     #     (benchmark) is mutable and not hashable.  And we don't want to
@@ -1151,16 +1180,18 @@ class TSeries(pd.Series):
         pyfinance.ols.OLS
         """
 
-        return ols.OLS(y=self, x=benchmark, has_const=has_const,
-                       use_const=use_const)
+        return ols.OLS(
+            y=self, x=benchmark, has_const=has_const, use_const=use_const
+        )
 
-    def _mkt_filter(self, benchmark, threshold, compare_op,
-                    include_benchmark=False):
+    def _mkt_filter(
+        self, benchmark, threshold, compare_op, include_benchmark=False
+    ):
         benchmark = _try_to_squeeze(benchmark)
         if not isinstance(benchmark, (TFrame, TSeries)):
-            raise ValueError('`benchmark` must be TFrame or TSeries.')
+            raise ValueError("`benchmark` must be TFrame or TSeries.")
         # Use the dunder method to be NumPy-compatible.
-        compare_op = getattr(benchmark, '{0}{1}{0}'.format('__', compare_op))
+        compare_op = getattr(benchmark, "{0}{1}{0}".format("__", compare_op))
         mask = compare_op(threshold).values
         if not include_benchmark:
             return self.loc[mask]
@@ -1171,9 +1202,11 @@ class TSeries(pd.Series):
         if not isinstance(rf, Number):
             if isinstance(rf, np.ndarray):
                 if len(rf) != len(self):
-                    raise ValueError('When passed as a NumPy array,'
-                                     '`rf` must be of equal length'
-                                     ' as `self`. to enable alignment.')
+                    raise ValueError(
+                        "When passed as a NumPy array,"
+                        "`rf` must be of equal length"
+                        " as `self`. to enable alignment."
+                    )
                     rf = TSeries(rf, freq=self.freq)
             else:
                 rf = rf.reindex(self.index)
@@ -1186,9 +1219,11 @@ class TSeries(pd.Series):
         if self.freq is None:
             freq = pd.infer_freq(self.index)
             if freq is None:
-                raise FrequencyError('No frequency was passed at'
-                                     ' instantiation, and one cannot'
-                                     ' be inferred.')
+                raise FrequencyError(
+                    "No frequency was passed at"
+                    " instantiation, and one cannot"
+                    " be inferred."
+                )
             freq = utils.get_anlz_factor(freq)
         else:
             freq = utils.get_anlz_factor(self.freq)
@@ -1210,12 +1245,13 @@ def _try_to_squeeze(obj, raise_=False):
         return obj.squeeze()
     else:
         if raise_:
-            raise ValueError('Input cannot be squeezed.')
+            raise ValueError("Input cannot be squeezed.")
         return obj
 
 
 class FrequencyError(ValueError):
     """Index frequency misspecified, missing, or not inferrable."""
+
     pass
 
 
@@ -1225,9 +1261,11 @@ class TFrame(object):
 
 
 # Default
-msg = ('A frequency was not passed to the method or at'
-       ' instantiation, and could not otherwise be inferred from the'
-       ' Index.')
+msg = (
+    "A frequency was not passed to the method or at"
+    " instantiation, and could not otherwise be inferred from the"
+    " Index."
+)
 
 
 # ---------------------------------------------------------------------
@@ -1257,8 +1295,8 @@ Examples
 {examples}
 """
 
-param = 'Parameters\n        -------'
-ret = 'Returns\n        -------'
+param = "Parameters\n        -------"
+ret = "Returns\n        -------"
 
 
 def _truncate_method_docstring(doc):
@@ -1271,67 +1309,71 @@ def _truncate_method_docstring(doc):
 
 
 methods = (
-    'alpha',
-    'anlzd_ret',
-    'anlzd_stdev',
-    'batting_avg',
-    'beta',
-    'beta_adj',
-    'calmar_ratio',
-    'capture_ratio',
-    'cuml_ret',
-    'cuml_idx',
-    'down_capture',
-    'downmarket_filter',
-    'drawdown_end',
-    'drawdown_idx',
-    'drawdown_length',
-    'drawdown_recov',
-    'drawdown_start',
-    'excess_drawdown_idx',
-    'excess_ret',
-    'gain_to_loss_ratio',
-    'geomean',
-    'growth_of_x',
-    'info_ratio',
-    'max_drawdown',
-    'msquared',
-    'pct_negative',
-    'pct_positive',
-    'recov_date',
-    'ret_idx',
-    'ret_rels',
-    'rollup',
-    'rsq',
-    'rsq_adj',
-    'semi_stdev',
-    'sharpe_ratio',
-    'sortino_ratio',
-    'tracking_error',
-    'treynor_ratio',
-    'tstat_alpha',
-    'tstat_beta',
-    'ulcer_idx',
-    'up_capture',
-    'upmarket_filter',
-    'CAPM'
-    )
+    "alpha",
+    "anlzd_ret",
+    "anlzd_stdev",
+    "batting_avg",
+    "beta",
+    "beta_adj",
+    "calmar_ratio",
+    "capture_ratio",
+    "cuml_ret",
+    "cuml_idx",
+    "down_capture",
+    "downmarket_filter",
+    "drawdown_end",
+    "drawdown_idx",
+    "drawdown_length",
+    "drawdown_recov",
+    "drawdown_start",
+    "excess_drawdown_idx",
+    "excess_ret",
+    "gain_to_loss_ratio",
+    "geomean",
+    "growth_of_x",
+    "info_ratio",
+    "max_drawdown",
+    "msquared",
+    "pct_negative",
+    "pct_positive",
+    "recov_date",
+    "ret_idx",
+    "ret_rels",
+    "rollup",
+    "rsq",
+    "rsq_adj",
+    "semi_stdev",
+    "sharpe_ratio",
+    "sortino_ratio",
+    "tracking_error",
+    "treynor_ratio",
+    "tstat_alpha",
+    "tstat_beta",
+    "ulcer_idx",
+    "up_capture",
+    "upmarket_filter",
+    "CAPM",
+)
 
-tseries_method_doc = ''
+tseries_method_doc = ""
 for method in methods:
     try:
         mdoc = _truncate_method_docstring(getattr(TSeries, method).__doc__)
-        tseries_method_doc += '{} : {}\n\n'.format(method, mdoc.strip())
+        tseries_method_doc += "{} : {}\n\n".format(method, mdoc.strip())
     except AttributeError:
         # No docstring (yet).
         pass
 
-TSeries.__doc__ = doc.format(securities='a single security',
-                             obj='Series',
-                             methods=tseries_method_doc.strip(),
-                             examples='TODO')
+TSeries.__doc__ = doc.format(
+    securities="a single security",
+    obj="Series",
+    methods=tseries_method_doc.strip(),
+    examples="TODO",
+)
 
-TFrame.__doc__ = doc.format(securities='multiple securities',
-                            obj='DataFrame',
-                            methods='TODO',
-                            examples='TODO')
+TFrame.__doc__ = doc.format(
+    securities="multiple securities",
+    obj="DataFrame",
+    methods="TODO",
+    examples="TODO",
+)

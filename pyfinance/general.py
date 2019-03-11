@@ -28,12 +28,21 @@ variance_inflation_factor
     Calculate variance inflation factor (VIF) for each all `regressors`.
 """
 
-__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
+__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
 __all__ = [
-    'activeshare', 'amortize', 'BestFitDist', 'corr_heatmap',
-    'ewm_params', 'ewm_weights', 'ewm_bootstrap', 'factor_loadings', 'PCA',
-    'PortSim', 'TEOpt', 'variance_inflation_factor'
-    ]
+    "activeshare",
+    "amortize",
+    "BestFitDist",
+    "corr_heatmap",
+    "ewm_params",
+    "ewm_weights",
+    "ewm_bootstrap",
+    "factor_loadings",
+    "PCA",
+    "PortSim",
+    "TEOpt",
+    "variance_inflation_factor",
+]
 
 from collections import OrderedDict
 import itertools
@@ -52,10 +61,10 @@ from statsmodels.tools import add_constant
 
 from pyfinance import datasets, ols, returns, utils
 
-NUMTODEC = {'num': 1., 'dec': 0.01}
+NUMTODEC = {"num": 1.0, "dec": 0.01}
 
 
-def activeshare(fund, idx, in_format='num'):
+def activeshare(fund, idx, in_format="num"):
     """Compute the active ahare of a fund versus an index.
 
     Formula is 0.5 * sum(abs(w_fund - w_idx)).
@@ -84,15 +93,15 @@ def activeshare(fund, idx, in_format='num'):
     """
 
     if not (fund.index.is_unique) and (idx.index.is_unique):
-        raise ValueError('Inputs must have unique indices.')
+        raise ValueError("Inputs must have unique indices.")
     if isinstance(fund, pd.DataFrame):
         cols = fund.columns
     fund = fund * NUMTODEC[in_format]
     idx = idx * NUMTODEC[in_format]
 
     union = fund.index.union(idx.index)
-    fund = fund.reindex(union, fill_value=0.).values
-    idx = idx.reindex(union, fill_value=0.).values
+    fund = fund.reindex(union, fill_value=0.0).values
+    idx = idx.reindex(union, fill_value=0.0).values
 
     if fund.ndim == 1:
         # Resulting active share will be a scalar
@@ -105,7 +114,7 @@ def activeshare(fund, idx, in_format='num'):
     return act_sh
 
 
-def amortize(rate, nper, pv, freq='M'):
+def amortize(rate, nper, pv, freq="M"):
     """Construct an amortization schedule for a fixed-rate loan.
 
     Rate -> annualized input
@@ -137,11 +146,15 @@ def amortize(rate, nper, pv, freq='M'):
         dfac = (1 + rate) ** nper
         return pv * dfac - pmt * (dfac - 1) / rate
 
-    res = pd.DataFrame({'beg_bal': balance(pv, rate, periods - 1, -pmt),
-                        'prin': principal,
-                        'interest': interest,
-                        'end_bal': balance(pv, rate, periods, -pmt)},
-                       index=periods)['beg_bal', 'prin', 'interest', 'end_bal']
+    res = pd.DataFrame(
+        {
+            "beg_bal": balance(pv, rate, periods - 1, -pmt),
+            "prin": principal,
+            "interest": interest,
+            "end_bal": balance(pv, rate, periods, -pmt),
+        },
+        index=periods,
+    )["beg_bal", "prin", "interest", "end_bal"]
     return res
 
 
@@ -190,7 +203,7 @@ class BestFitDist(object):
     2       norm  0.00158  (4.88130759176, ...
     """
 
-    def __init__(self, x, bins='auto', distributions=None):
+    def __init__(self, x, bins="auto", distributions=None):
         self.x = x
         self.bins = bins
         if distributions is None:
@@ -218,7 +231,7 @@ class BestFitDist(object):
         bin_edges = (bin_edges + np.roll(bin_edges, -1))[:-1] / 2.0
 
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore')
+            warnings.filterwarnings("ignore")
 
             sses = []
             params = []
@@ -239,7 +252,7 @@ class BestFitDist(object):
                     sses.append(sse)
                     params.append(param)
 
-                    if best_sse > sse > 0.:
+                    if best_sse > sse > 0.0:
                         best_dist = dist
                         best_param = param
                         best_sse = sse
@@ -263,15 +276,23 @@ class BestFitDist(object):
 
     def best(self):
         """The resulting best-fit distribution, its parameters, and SSE."""
-        return pd.Series({'name': self.best_dist.name,
-                          'params': self.best_param,
-                          'sse': self.best_sse})
+        return pd.Series(
+            {
+                "name": self.best_dist.name,
+                "params": self.best_param,
+                "sse": self.best_sse,
+            }
+        )
 
-    def all(self, by='name', ascending=True):
+    def all(self, by="name", ascending=True):
         """All tested distributions, their parameters, and SSEs."""
-        res = pd.DataFrame({'name': self.distributions,
-                            'params': self.params,
-                            'sse': self.sses})[['name', 'sse', 'params']]
+        res = pd.DataFrame(
+            {
+                "name": self.distributions,
+                "params": self.params,
+                "sse": self.sses,
+            }
+        )[["name", "sse", "params"]]
         res.sort_values(by=by, ascending=ascending, inplace=True)
 
         return res
@@ -282,8 +303,17 @@ class BestFitDist(object):
         # TODO: labels
 
 
-def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
-                 linewidths=0.5, square=True, figsize=(10, 10), **kwargs):
+def corr_heatmap(
+    x,
+    mask_half=True,
+    cmap="RdYlGn_r",
+    vmin=-1,
+    vmax=1,
+    linewidths=0.5,
+    square=True,
+    figsize=(10, 10),
+    **kwargs
+):
     """Wrapper around seaborn.heatmap for visualizing correlation matrix.
 
     Parameters
@@ -313,10 +343,17 @@ def corr_heatmap(x, mask_half=True, cmap='RdYlGn_r', vmin=-1, vmax=1,
         mask[np.triu_indices_from(mask)] = True
     else:
         mask = None
-    with sns.axes_style('white'):
-        return sns.heatmap(x.corr(), cmap=cmap, vmin=vmin, vmax=vmax,
-                           linewidths=linewidths, square=square,
-                           mask=mask, **kwargs)
+    with sns.axes_style("white"):
+        return sns.heatmap(
+            x.corr(),
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            linewidths=linewidths,
+            square=square,
+            mask=mask,
+            **kwargs
+        )
 
 
 def ewm_params(param, param_value):
@@ -334,30 +371,30 @@ def ewm_params(param, param_value):
         Layout/index of corresponding parameters.
     """
 
-    if param not in ['alpha', 'com', 'span', 'halflife']:
-        raise NameError('`param` must be one of {alpha, com, span, halflife}')
+    if param not in ["alpha", "com", "span", "halflife"]:
+        raise NameError("`param` must be one of {alpha, com, span, halflife}")
 
     def input_alpha(a):
-        com = 1./a - 1.
-        span = 2./a - 1.
-        halflife = np.log(0.5)/np.log(1. - a)
-        return {'com': com, 'span': span, 'halflife': halflife}
+        com = 1.0 / a - 1.0
+        span = 2.0 / a - 1.0
+        halflife = np.log(0.5) / np.log(1.0 - a)
+        return {"com": com, "span": span, "halflife": halflife}
 
     def output_alpha(param, p):
         eqs = {
-            'com': 1./(1. + p),
-            'span': 2./(p + 1.),
-            'halflife': 1. - np.exp(np.log(0.5)/p)
+            "com": 1.0 / (1.0 + p),
+            "span": 2.0 / (p + 1.0),
+            "halflife": 1.0 - np.exp(np.log(0.5) / p),
         }
         return eqs[param]
 
-    if param == 'alpha':
+    if param == "alpha":
         dct = input_alpha(a=param_value)
         alpha = param_value
     else:
         alpha = output_alpha(param=param, p=param_value)
         dct = input_alpha(a=alpha)
-    dct.update({'alpha': alpha})
+    dct.update({"alpha": alpha})
     return dct
 
 
@@ -369,22 +406,23 @@ def ewm_weights(i, com=None, span=None, halflife=None, alpha=None):
     """
 
     if not any((com, span, halflife, alpha)):
-        raise ValueError('specify one of `com`, `span`, `halflife`, `alpha`')
+        raise ValueError("specify one of `com`, `span`, `halflife`, `alpha`")
 
     params = [com, span, halflife, alpha]
     pos = next(i for (i, x) in enumerate(params) if x)
     param_value = next(item for item in params if item is not None)
-    lookup = dict(enumerate(['com', 'span', 'halflife', 'alpha']))
+    lookup = dict(enumerate(["com", "span", "halflife", "alpha"]))
     param = lookup[pos]
-    alpha = ewm_params(param=param, param_value=param_value)['alpha']
+    alpha = ewm_params(param=param, param_value=param_value)["alpha"]
 
-    res = (1. - alpha) ** np.arange(i)[::-1]
+    res = (1.0 - alpha) ** np.arange(i)[::-1]
     res /= res.sum()
     return res
 
 
-def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
-                  alpha=None):
+def ewm_bootstrap(
+    a, size=None, com=None, span=None, halflife=None, alpha=None
+):
     """Bootstrap a new distribution through exponential weighting.
 
     Parameters
@@ -425,15 +463,17 @@ def ewm_bootstrap(a, size=None, com=None, span=None, halflife=None,
     """
 
     if not any((com, span, halflife, alpha)):
-        raise ValueError('Specify one of `com`, `span`, `halflife`, `alpha`.')
-    p = ewm_weights(i=len(a), com=com, span=span, halflife=halflife,
-                    alpha=alpha)
+        raise ValueError("Specify one of `com`, `span`, `halflife`, `alpha`.")
+    p = ewm_weights(
+        i=len(a), com=com, span=span, halflife=halflife, alpha=alpha
+    )
     res = np.random.choice(a=a, size=size, p=p)
     return res
 
 
-def factor_loadings(r, factors=None, scale=False, pickle_from=None,
-                    pickle_to=None):
+def factor_loadings(
+    r, factors=None, scale=False, pickle_from=None, pickle_to=None
+):
     """Security factor exposures generated through OLS regression.
 
     Incorporates a handful of well-known factors models.
@@ -471,54 +511,59 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
     #       or lowest SSE/MSE?
 
     if factors is None:
-        factors = datasets.load_factors(pickle_from=pickle_from,
-                                        pickle_to=pickle_to)
+        factors = datasets.load_factors(
+            pickle_from=pickle_from, pickle_to=pickle_to
+        )
 
     r, factors = utils.constrain(r, factors)
 
     if isinstance(r, pd.Series):
         n = 1
-        r = r.subtract(factors['RF'])
+        r = r.subtract(factors["RF"])
     elif isinstance(r, pd.DataFrame):
         n = r.shape[1]
-        r = r.subtract(np.tile(factors['RF'], (n, 1)).T)
+        r = r.subtract(np.tile(factors["RF"], (n, 1)).T)
         # r = r.subtract(factors['RF'].values.reshape(-1,1))
     else:
-        raise ValueError('`r` must be one of (Series, DataFrame)')
+        raise ValueError("`r` must be one of (Series, DataFrame)")
 
     if scale:
         # Scale up the volatilities of all factors besides MKT & RF, to the
         # vol of MKT.  Both means and the standard deviations are multiplied
         # by the scale factor (ratio of MKT.std() to other stdevs)
-        tgtvol = factors['MKT'].std()
-        diff = factors.columns.difference(['MKT', 'RF'])  # don't scale these
+        tgtvol = factors["MKT"].std()
+        diff = factors.columns.difference(["MKT", "RF"])  # don't scale these
         vols = factors[diff].std()
         factors.loc[:, diff] = factors[diff] * tgtvol / vols
 
     # Right-hand-side dict of models
-    rhs = OrderedDict([('Capital Asset Pricing Model (CAPM)',
-                        ['MKT']),
-                       ('Fama-French 3-Factor Model',
-                        ['MKT', 'SMB', 'HML']),
-                       ('Carhart 4-Factor Model',
-                        ['MKT', 'SMB', 'HMLD', 'UMD']),
-                       ('Fama-French 5-Factor Model',
-                        ['MKT', 'SMB', 'HMLD', 'RMW', 'CMA']),
-                       ('AQR 6-Factor Model',
-                        ['MKT', 'SMB', 'HMLD', 'RMW', 'CMA', 'UMD']),
-                       ('Price-Signal Model',
-                        ['MKT', 'UMD', 'STR', 'LTR'])
-                       ('Fung-Hsieh Trend-Following Model',
-                        ['BDLB', 'FXLB', 'CMLB', 'STLB', 'SILB'])
-                       ])
+    rhs = OrderedDict(
+        [
+            ("Capital Asset Pricing Model (CAPM)", ["MKT"]),
+            ("Fama-French 3-Factor Model", ["MKT", "SMB", "HML"]),
+            ("Carhart 4-Factor Model", ["MKT", "SMB", "HMLD", "UMD"]),
+            (
+                "Fama-French 5-Factor Model",
+                ["MKT", "SMB", "HMLD", "RMW", "CMA"],
+            ),
+            (
+                "AQR 6-Factor Model",
+                ["MKT", "SMB", "HMLD", "RMW", "CMA", "UMD"],
+            ),
+            ("Price-Signal Model", ["MKT", "UMD", "STR", "LTR"])(
+                "Fung-Hsieh Trend-Following Model",
+                ["BDLB", "FXLB", "CMLB", "STLB", "SILB"],
+            ),
+        ]
+    )
 
     # Get union of keys and sort them according to `factors.columns`' order;
     # used later as columns in result
     cols = set(itertools.chain(*rhs.values()))
-    cols = [o for o in factors.columns if o in cols] + ['alpha', 'rsq_adj']
+    cols = [o for o in factors.columns if o in cols] + ["alpha", "rsq_adj"]
 
     # Empty DataFrame to be populated with each regression's attributes
-    stats = ['coef', 'tstat']
+    stats = ["coef", "tstat"]
     idx = pd.MultiIndex.from_product([rhs.keys(), stats])
     res = pd.DataFrame(columns=cols, index=idx)
 
@@ -529,13 +574,12 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         for col in r:
             for k, v in rhs.items():
                 res = res.copy()
-                model = ols.OLS(y=r[col], x=factors[v],
-                                hasconst=False)
-                res.loc[(k, 'coef'), factors[v].columns] = model.beta()
-                res.loc[(k, 'tstat'), factors[v].columns] = model.tstat_beta()
-                res.loc[(k, 'coef'), 'alpha'] = model.alpha()
-                res.loc[(k, 'tstat'), 'alpha'] = model.tstat_alpha()
-                res.loc[(k, 'coef'), 'rsq_adj'] = model.rsq_adj()
+                model = ols.OLS(y=r[col], x=factors[v], hasconst=False)
+                res.loc[(k, "coef"), factors[v].columns] = model.beta()
+                res.loc[(k, "tstat"), factors[v].columns] = model.tstat_beta()
+                res.loc[(k, "coef"), "alpha"] = model.alpha()
+                res.loc[(k, "tstat"), "alpha"] = model.tstat_alpha()
+                res.loc[(k, "coef"), "rsq_adj"] = model.rsq_adj()
             d[col] = res
         res = d
 
@@ -543,11 +587,11 @@ def factor_loadings(r, factors=None, scale=False, pickle_from=None,
         # Single DataFrame
         for k, v in rhs.items():
             model = ols.OLS(y=r, x=factors[v], hasconst=False)
-            res.loc[(k, 'coef'), factors[v].columns] = model.beta()
-            res.loc[(k, 'tstat'), factors[v].columns] = model.tstat_beta()
-            res.loc[(k, 'coef'), 'alpha'] = model.alpha()
-            res.loc[(k, 'tstat'), 'alpha'] = model.tstat_alpha()
-            res.loc[(k, 'coef'), 'rsq_adj'] = model.rsq_adj()
+            res.loc[(k, "coef"), factors[v].columns] = model.beta()
+            res.loc[(k, "tstat"), factors[v].columns] = model.tstat_beta()
+            res.loc[(k, "coef"), "alpha"] = model.alpha()
+            res.loc[(k, "tstat"), "alpha"] = model.tstat_alpha()
+            res.loc[(k, "coef"), "rsq_adj"] = model.rsq_adj()
 
     return res
 
@@ -583,7 +627,7 @@ class PCA(object):
         Using Principal Component Analysis, 2016
     """
 
-    def __init__(self, m, threshold='Jolliffe', u_based_decision=False):
+    def __init__(self, m, threshold="Jolliffe", u_based_decision=False):
         # Keep a raw version of m for view and create a scaled version, ms
         # scaled to N~(0,1)
         if isinstance(m, pd.DataFrame):
@@ -593,17 +637,17 @@ class PCA(object):
             self.feature_names = range(m.shape[1])
             self.m = m
         if np.isnan(self.m).any():
-            raise ValueError('Input contains NaN')
+            raise ValueError("Input contains NaN")
         self.ms = scale(self.m)
 
-        thresholds = {'Kaiser': 1.0, 'Jolliffe': 0.7}
+        thresholds = {"Kaiser": 1.0, "Jolliffe": 0.7}
         if threshold is not None:
             if isinstance(threshold, str):
                 self.threshold = thresholds[threshold]
             else:
                 self.threshold = float(threshold)
         else:
-            self.threshold = 0.
+            self.threshold = 0.0
         self.u_based_decision = u_based_decision
 
     def fit(self):
@@ -638,8 +682,9 @@ class PCA(object):
         # This implementation uses u_based_decision=False rather than the
         # default True to flip that logic and ensure the resulting
         # components and loadings have high positive coefficients
-        self.u, self.vt = svd_flip(self.u, self.v,
-                                   u_based_decision=self.u_based_decision)
+        self.u, self.vt = svd_flip(
+            self.u, self.v, u_based_decision=self.u_based_decision
+        )
         self.v = self.vt.T
 
         # Drop eigenvalues with value > threshold
@@ -647,31 +692,33 @@ class PCA(object):
         self.eigenvalues = self.s ** 2 / self.n_samples
         self.keep = np.count_nonzero(self.eigenvalues > self.threshold)
 
-        self.inertia = (self.eigenvalues / self.eigenvalues.sum())[:self.keep]
-        self.cumulative_inertia = self.inertia.cumsum()[:self.keep]
-        self.eigenvalues = self.eigenvalues[:self.keep]
+        self.inertia = (self.eigenvalues / self.eigenvalues.sum())[: self.keep]
+        self.cumulative_inertia = self.inertia.cumsum()[: self.keep]
+        self.eigenvalues = self.eigenvalues[: self.keep]
 
         return self
 
     @property
     def eigen_table(self):
         """Eigenvalues, expl. variance, and cumulative expl. variance."""
-        idx = ['Eigenvalue', 'Variability (%)', 'Cumulative (%)']
-        table = pd.DataFrame(np.array([self.eigenvalues,
-                                       self.inertia,
-                                       self.cumulative_inertia]),
-                             columns=['F%s' % i for i in
-                                      range(1, self.keep + 1)],
-                             index=idx)
+        idx = ["Eigenvalue", "Variability (%)", "Cumulative (%)"]
+        table = pd.DataFrame(
+            np.array(
+                [self.eigenvalues, self.inertia, self.cumulative_inertia]
+            ),
+            columns=["F%s" % i for i in range(1, self.keep + 1)],
+            index=idx,
+        )
 
         return table
 
     def loadings(self):
         """Loadings = eigenvectors times sqrt(eigenvalues)."""
-        loadings = self.v[:, :self.keep] * np.sqrt(self.eigenvalues)
-        cols = ['PC%s' % i for i in range(1,  self.keep + 1)]
-        loadings = pd.DataFrame(loadings, columns=cols,
-                                index=self.feature_names)
+        loadings = self.v[:, : self.keep] * np.sqrt(self.eigenvalues)
+        cols = ["PC%s" % i for i in range(1, self.keep + 1)]
+        loadings = pd.DataFrame(
+            loadings, columns=cols, index=self.feature_names
+        )
         return loadings
 
     @property
@@ -679,17 +726,21 @@ class PCA(object):
         """Number of components needed to explain > x% of variance."""
         return 1 + np.count_nonzero(self.cumulative_inertia < x)
 
-    def screeplot(self, title=None, xlabel='Eigenvalue',
-                  ylabel='Cumulative Explained Variance (%)'):
-        plt.plot(range(1, self.keep + 1), self.cumulative_inertia, 'o-')
+    def screeplot(
+        self,
+        title=None,
+        xlabel="Eigenvalue",
+        ylabel="Cumulative Explained Variance (%)",
+    ):
+        plt.plot(range(1, self.keep + 1), self.cumulative_inertia, "o-")
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
-        plt.title('Scree Plot')
+        plt.title("Scree Plot")
         plt.show()
 
     def varimax(self):
         loadings = self.loadings().values
-        gamma = 1.
+        gamma = 1.0
         q = 20
         tol = 1e-6
         p, k = loadings.shape
@@ -699,18 +750,24 @@ class PCA(object):
         for i in range(q):
             d_old = d
             lam = np.dot(loadings, r)
-            u, s, vh = np.linalg.svd(np.dot(
-                loadings.T, np.asarray(lam) ** 3 - (gamma / p)
-                * np.dot(lam, np.diag(np.diag(np.dot(lam.T, lam))))))
+            u, s, vh = np.linalg.svd(
+                np.dot(
+                    loadings.T,
+                    np.asarray(lam) ** 3
+                    - (gamma / p)
+                    * np.dot(lam, np.diag(np.diag(np.dot(lam.T, lam)))),
+                )
+            )
             r = np.dot(u, vh)
             d = np.sum(s)
             if d / d_old < tol:
                 break
 
-        cols = ['PC%s' % i for i in range(1, self.keep + 1)]
+        cols = ["PC%s" % i for i in range(1, self.keep + 1)]
 
-        return pd.DataFrame(np.dot(loadings, r), columns=cols,
-                            index=self.feature_names)
+        return pd.DataFrame(
+            np.dot(loadings, r), columns=cols, index=self.feature_names
+        )
 
 
 class PortSim(object):
@@ -763,13 +820,28 @@ class PortSim(object):
         numeral form to decimal form
     """
 
-    def __init__(self, r, fee=0., fee_freq='Q', start=None, end=None,
-                 lookback={}, strict=False, dist_amt=None, dist_pct=None,
-                 dist_freq=None, v0=float(1e6), include_start=True, freq='M',
-                 name=None,  in_format='num'):
+    def __init__(
+        self,
+        r,
+        fee=0.0,
+        fee_freq="Q",
+        start=None,
+        end=None,
+        lookback={},
+        strict=False,
+        dist_amt=None,
+        dist_pct=None,
+        dist_freq=None,
+        v0=float(1e6),
+        include_start=True,
+        freq="M",
+        name=None,
+        in_format="num",
+    ):
 
-        self.gross = returns.prep(r=r, freq=freq, name=name,
-                                  in_format=in_format)
+        self.gross = returns.prep(
+            r=r, freq=freq, name=name, in_format=in_format
+        )
 
         # fee_freq: if str -> frequency; if int/float -> periods/yr
         # Get `fee` to a per-period float
@@ -789,24 +861,30 @@ class PortSim(object):
             # TODO: cleanup
             self.gross = utils.constrain_horizon(self.gross, **lookback)
         elif all((any((start, end)), lookback)):
-            raise ValueError('if `lookback` is specified, both `start` and'
-                             ' `end` should be None')
+            raise ValueError(
+                "if `lookback` is specified, both `start` and"
+                " `end` should be None"
+            )
 
         self.index = self.gross.index
         self.columns = self.gross.columns
 
-        masktypes = {12.: 'is_month_end',
-                     4.: 'is_quarter_end',
-                     1.: 'is_quarter_end'}
+        masktypes = {
+            12.0: "is_month_end",
+            4.0: "is_quarter_end",
+            1.0: "is_quarter_end",
+        }
 
         mask = getattr(self.index, masktypes[self.fee_freq])
-        self.feesched = np.where(mask, self.fee, 0.)
+        self.feesched = np.where(mask, self.fee, 0.0)
 
         # Net of fees (not yet of distributions)
-        self.net = (1. + self.gross.values) \
-            * (1. - self.feesched.reshape(-1, 1)) - 1.
-        self.net = pd.DataFrame(self.net, index=self.index,
-                                columns=self.columns)
+        self.net = (1.0 + self.gross.values) * (
+            1.0 - self.feesched.reshape(-1, 1)
+        ) - 1.0
+        self.net = pd.DataFrame(
+            self.net, index=self.index, columns=self.columns
+        )
 
         self.dist_amt = dist_amt
         self.dist_pct = dist_pct
@@ -824,9 +902,11 @@ class PortSim(object):
                 res = returns.insert_start(res, base=self.v0)
 
         elif self.dist_pct is not None:
-            res = returns.return_index((1.+self.net) * (1.-self.dist_pct) - 1.,
-                                       base=self.v0,
-                                       include_start=self.include_start)
+            res = returns.return_index(
+                (1.0 + self.net) * (1.0 - self.dist_pct) - 1.0,
+                base=self.v0,
+                include_start=self.include_start,
+            )
         return res
 
 
@@ -853,14 +933,14 @@ class TEOpt(object):
         Optimization constraint: proxy weights should sum to this parameter
     """
 
-    def __init__(self, r, proxies, window, sumto=1.):
+    def __init__(self, r, proxies, window, sumto=1.0):
 
         self.r = r
         self.proxies = proxies
         self.window = int(window)
         self.sumto = sumto
 
-        self.newidx = r.index[window-1:]
+        self.newidx = r.index[window - 1 :]
         self.cols = proxies.columns
         self.n = proxies.shape[1]
 
@@ -882,14 +962,20 @@ class TEOpt(object):
 
         ew = utils.equal_weights(n=self.n, sumto=self.sumto)
         bnds = tuple((0, 1) for x in range(self.n))
-        cons = ({'type': 'eq', 'fun': lambda x: np.sum(x) - self.sumto})
+        cons = {"type": "eq", "fun": lambda x: np.sum(x) - self.sumto}
 
         xs = []
         funs = []
         for i, j in zip(self._r, self._proxies):
-            opt = sco.minimize(te, x0=ew, args=(i, j), method='SLSQP',
-                               bounds=bnds, constraints=cons)
-            x, fun = opt['x'], opt['fun']
+            opt = sco.minimize(
+                te,
+                x0=ew,
+                args=(i, j),
+                method="SLSQP",
+                bounds=bnds,
+                constraints=cons,
+            )
+            x, fun = opt["x"], opt["fun"]
             xs.append(x)
             funs.append(fun)
         self._xs = np.array(xs)
@@ -908,8 +994,9 @@ class TEOpt(object):
 
     def replicate(self):
         """Forward-month returns of the replicating portfolio."""
-        return np.sum(self.proxies[self.window:] * self._xs[:-1],
-                      axis=1).reindex(self.r.index)
+        return np.sum(
+            self.proxies[self.window :] * self._xs[:-1], axis=1
+        ).reindex(self.r.index)
 
 
 def variance_inflation_factor(regressors, hasconst=False):
@@ -962,8 +1049,8 @@ def variance_inflation_factor(regressors, hasconst=False):
         x_i = regressors.iloc[:, x]
         mask = np.arange(k) != x
         x_not_i = regressors.iloc[:, mask]
-        rsq = linear_model.OLS(x_i, x_not_i, missing='drop').fit().rsquared_adj
-        vif = 1. / (1. - rsq)
+        rsq = linear_model.OLS(x_i, x_not_i, missing="drop").fit().rsquared_adj
+        vif = 1.0 / (1.0 - rsq)
         return vif
 
     vifs = pd.Series(np.arange(k), index=regressors.columns)

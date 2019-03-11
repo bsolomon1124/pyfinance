@@ -32,14 +32,31 @@ Option strategies inheritance hierarchy:
             - ShortIronCondor
 """
 
-__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
+__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
 __all__ = [
-    'BSM', 'Call', 'Put', 'OpStrat', 'Straddle', 'ShortStraddle', 'Strangle',
-    'ShortStrangle', 'Strip', 'Strap', 'BullSpread', 'BearSpread',
-    'LongPutLadder', 'ShortPutLadder', 'LongButterfly', 'ShortButterfly',
-    'LongIronButterfly', 'ShortIronButterfly', 'LongCondor', 'ShortCondor',
-    'LongIronCondor', 'ShortIronCondor'
-    ]
+    "BSM",
+    "Call",
+    "Put",
+    "OpStrat",
+    "Straddle",
+    "ShortStraddle",
+    "Strangle",
+    "ShortStrangle",
+    "Strip",
+    "Strap",
+    "BullSpread",
+    "BearSpread",
+    "LongPutLadder",
+    "ShortPutLadder",
+    "LongButterfly",
+    "ShortButterfly",
+    "LongIronButterfly",
+    "ShortIronButterfly",
+    "LongCondor",
+    "ShortCondor",
+    "LongIronCondor",
+    "ShortIronCondor",
+]
 
 from collections import OrderedDict
 import itertools
@@ -117,9 +134,9 @@ class BSM(object):
            10.6198, 10.7191, 10.8183])
     """
 
-    def __init__(self, S0, K, T, r, sigma, kind='call'):
+    def __init__(self, S0, K, T, r, sigma, kind="call"):
         kind = kind.lower()
-        if kind not in ['call', 'put']:
+        if kind not in ["call", "put"]:
             raise ValueError("`kind` must be in ('call', 'put')")
 
         self.kind = kind
@@ -129,9 +146,10 @@ class BSM(object):
         self.r = r
         self.sigma = sigma
 
-        self.d1 = ((np.log(self.S0 / self.K)
-                   + (self.r + 0.5 * self.sigma ** 2) * self.T)
-                   / (self.sigma * np.sqrt(self.T)))
+        self.d1 = (
+            np.log(self.S0 / self.K)
+            + (self.r + 0.5 * self.sigma ** 2) * self.T
+        ) / (self.sigma * np.sqrt(self.T))
         self.d2 = self.d1 - self.sigma * np.sqrt(self.T)
 
         # Several greeks use negated terms dependent on option type.
@@ -141,47 +159,59 @@ class BSM(object):
         #     - element 1 (1, -1) is used in rho and theta
         #     - negated 1 (-1, 1) is used in theta
 
-        self._sign = {'call': [0, 1], 'put': [-1, -1]}
+        self._sign = {"call": [0, 1], "put": [-1, -1]}
         self._sign = self._sign[self.kind]
 
     def __repr__(self):
         # Careful with format strings here because we may have
         #     scalars or arrays.
-        return ('BSM(kind={},\n\tS0={},\n\tK={},\n\tT={},\n\tr={},\n\tsigma={})'  # noqa
-                .format(self.kind, self.S0, self.K,
-                        self.T, self.r, self.sigma))
+        return "BSM(kind={},\n\tS0={},\n\tK={},\n\tT={},\n\tr={},\n\tsigma={})".format(  # noqa
+            self.kind, self.S0, self.K, self.T, self.r, self.sigma
+        )
 
     def value(self):
         """Compute option value according to BSM model."""
-        return self._sign[1] * self.S0 \
-            * norm.cdf(self._sign[1] * self.d1, 0.0, 1.0) \
-            - self._sign[1] * self.K * np.exp(-self.r * self.T) \
-            * norm.cdf(self._sign[1] * self.d2, 0.0, 1.0)
+        return self._sign[1] * self.S0 * norm.cdf(
+            self._sign[1] * self.d1, 0.0, 1.0
+        ) - self._sign[1] * self.K * np.exp(-self.r * self.T) * norm.cdf(
+            self._sign[1] * self.d2, 0.0, 1.0
+        )
 
     def delta(self):
         return norm.cdf(self.d1, 0.0, 1.0) + self._sign[0]
 
     def gamma(self):
-        return (norm.pdf(self.d1, 0.0, 1.0)
-                / (self.S0 * self.sigma * np.sqrt(self.T)))
+        return norm.pdf(self.d1, 0.0, 1.0) / (
+            self.S0 * self.sigma * np.sqrt(self.T)
+        )
 
     def vega(self):
         return self.S0 * norm.pdf(self.d1, 0.0, 1.0) * np.sqrt(self.T)
 
     def theta(self):
-        return -1. * (self.S0 * norm.pdf(self.d1, 0.0, 1.0) * self.sigma) \
-                   / (2. * np.sqrt(self.T)) \
-                   - 1. * self._sign[1] * self.r * self.K \
-                   * np.exp(-self.r * self.T) * norm.cdf(self._sign[1]
-                                                         * self.d2, 0.0, 1.0)
+        return -1.0 * (self.S0 * norm.pdf(self.d1, 0.0, 1.0) * self.sigma) / (
+            2.0 * np.sqrt(self.T)
+        ) - 1.0 * self._sign[1] * self.r * self.K * np.exp(
+            -self.r * self.T
+        ) * norm.cdf(
+            self._sign[1] * self.d2, 0.0, 1.0
+        )
 
     def rho(self):
-        return (self._sign[1] * self.K * self.T * np.exp(-self.r * self.T)
-                * norm.cdf(self._sign[1] * self.d2, 0.0, 1.0))
+        return (
+            self._sign[1]
+            * self.K
+            * self.T
+            * np.exp(-self.r * self.T)
+            * norm.cdf(self._sign[1] * self.d2, 0.0, 1.0)
+        )
 
     def omega(self):
-        return ((norm.cdf(self.d1, 0.0, 1.0) + self._sign[0])
-                * self.S0 / self.value())
+        return (
+            (norm.cdf(self.d1, 0.0, 1.0) + self._sign[0])
+            * self.S0
+            / self.value()
+        )
 
     def implied_vol(self, value, precision=1.0e-5, iters=100):
         """Get implied vol at the specified price using an iterative approach.
@@ -196,10 +226,16 @@ class BSM(object):
             Standard Deviation, 1988.
         """
 
-        vol = np.sqrt(2. * np.pi / self.T) * (value / self.S0)
+        vol = np.sqrt(2.0 * np.pi / self.T) * (value / self.S0)
         for _ in itertools.repeat(None, iters):  # Faster than range
-            opt = BSM(S0=self.S0, K=self.K, T=self.T, r=self.r, sigma=vol,
-                      kind=self.kind)
+            opt = BSM(
+                S0=self.S0,
+                K=self.K,
+                T=self.T,
+                r=self.r,
+                sigma=vol,
+                kind=self.kind,
+            )
             diff = value - opt.value()
             if abs(diff) < precision:
                 return vol
@@ -207,29 +243,39 @@ class BSM(object):
         return vol
 
     def summary(self, name=None):
-        res = OrderedDict([
-            ('Value', self.value()),
-            ('d1', self.d1),
-            ('d2', self.d2),
-            ('Delta', self.delta()),
-            ('Gamma', self.gamma()),
-            ('Vega', self.vega()),
-            ('Theta', self.theta()),
-            ('Rho', self.rho()),
-            ('Omega', self.omega())
-            ])
+        res = OrderedDict(
+            [
+                ("Value", self.value()),
+                ("d1", self.d1),
+                ("d2", self.d2),
+                ("Delta", self.delta()),
+                ("Gamma", self.gamma()),
+                ("Vega", self.vega()),
+                ("Theta", self.theta()),
+                ("Rho", self.rho()),
+                ("Omega", self.omega()),
+            ]
+        )
         return res
 
 
 # Put & call: building blocks for more complex strategies
 # ---------------------------------------------------------------------
 
-SIGN = {'long': 1., 'Long': 1., 'l': 1., 'L': 1.,
-        'short': -1., 'Short': -1., 's': -1., 'S': -1.}
+SIGN = {
+    "long": 1.0,
+    "Long": 1.0,
+    "l": 1.0,
+    "L": 1.0,
+    "short": -1.0,
+    "Short": -1.0,
+    "s": -1.0,
+    "S": -1.0,
+}
 
 
 class Option(object):
-    def __init__(self, K=None, price=None, St=None, kind='call', pos='long'):
+    def __init__(self, K=None, price=None, St=None, kind="call", pos="long"):
         self.K = K
         self.price = price
         self.St = St
@@ -238,20 +284,22 @@ class Option(object):
 
     def __repr__(self):
         if self.St is None:
-            return ('{0}(K={1:0.2f}, price={2:0.2f}, St=None)'
-                    .format(self.kind.title(), self.K, self.price))
+            return "{0}(K={1:0.2f}, price={2:0.2f}, St=None)".format(
+                self.kind.title(), self.K, self.price
+            )
         else:
-            return ('{0}(K={1:0.2f}, price={2:0.2f}, St={2:0.2f})'
-                    .format(self.kind.title(), self.K, self.price, self.St))
+            return "{0}(K={1:0.2f}, price={2:0.2f}, St={2:0.2f})".format(
+                self.kind.title(), self.K, self.price, self.St
+            )
 
 
 class Call(Option):
-    def __init__(self, K=None, price=None, St=None, pos='long'):
-        Option.__init__(self, K=K, price=price, St=St, kind='call', pos=pos)
+    def __init__(self, K=None, price=None, St=None, pos="long"):
+        Option.__init__(self, K=K, price=price, St=St, kind="call", pos=pos)
 
     def payoff(self, St=None):
         St = self.St if St is None else St
-        return SIGN[self.pos] * np.maximum(0., St - self.K)
+        return SIGN[self.pos] * np.maximum(0.0, St - self.K)
 
     def profit(self, St=None):
         St = self.St if St is None else St
@@ -259,12 +307,12 @@ class Call(Option):
 
 
 class Put(Option):
-    def __init__(self, K=None, price=None, St=None, pos='long'):
-        Option.__init__(self, K=K, price=price, St=St, kind='put', pos=pos)
+    def __init__(self, K=None, price=None, St=None, pos="long"):
+        Option.__init__(self, K=K, price=price, St=St, kind="put", pos=pos)
 
     def payoff(self, St=None):
         St = self.St if St is None else St
-        return SIGN[self.pos] * np.maximum(0., self.K - St)
+        return SIGN[self.pos] * np.maximum(0.0, self.K - St)
 
     def profit(self, St=None):
         St = self.St if St is None else St
@@ -279,14 +327,23 @@ class Put(Option):
 
 class OpStrat(object):
     """Generic option strategy construction."""
+
     def __init__(self, St=None):
         self.St = St
         self.options = []
 
-    def add_option(self, K=None, price=None, St=None, kind='call', pos='long'):
+    def add_option(self, K=None, price=None, St=None, kind="call", pos="long"):
         """Add an option to the object's `options` container."""
-        kinds = {'call': Call, 'Call': Call, 'c': Call, 'C': Call,
-                 'put': Put, 'Put': Put, 'p': Put, 'P': Put}
+        kinds = {
+            "call": Call,
+            "Call": Call,
+            "c": Call,
+            "C": Call,
+            "put": Put,
+            "Put": Put,
+            "p": Put,
+            "P": Put,
+        }
         St = self.St if St is None else St
         option = kinds[kind](St=St, K=K, price=price, pos=pos)
         self.options.append(option)
@@ -309,15 +366,17 @@ class OpStrat(object):
             exprs = [St] * len(self.options)
             kinds = [op.kind for op in self.options]
             poss = [op.pos for op in self.options]
-            res = OrderedDict([
-                ('kind', kinds),
-                ('position', poss),
-                ('strike', strikes),
-                ('price', prices),
-                ('St', exprs),
-                ('payoff', payoffs),
-                ('profit', profits),
-                ])
+            res = OrderedDict(
+                [
+                    ("kind", kinds),
+                    ("position", poss),
+                    ("strike", strikes),
+                    ("price", prices),
+                    ("St", exprs),
+                    ("payoff", payoffs),
+                    ("profit", profits),
+                ]
+            )
 
             return DataFrame(res)
         else:
@@ -356,35 +415,39 @@ class OpStrat(object):
 
 class Straddle(OpStrat):
     """Long-volatility exposure.  Long a put and call, both at K."""
+
     def __init__(self, St=None, K=None, callprice=None, putprice=None):
         super().__init__(St=St)
         self.K = K
-        self.add_option(K=K, price=callprice, St=St, kind='call')
-        self.add_option(K=K, price=putprice, St=St, kind='put')
+        self.add_option(K=K, price=callprice, St=St, kind="call")
+        self.add_option(K=K, price=putprice, St=St, kind="put")
 
 
 class Strip(Straddle):
     """Combination of a straddle with a put.  Long 1 call & 2 puts at K."""
+
     def __init__(self, St=None, K=None, callprice=None, putprice=None):
         super().__init__(St=St, K=K, callprice=callprice, putprice=putprice)
-        self.add_option(K=K, price=putprice, St=St, kind='put')
+        self.add_option(K=K, price=putprice, St=St, kind="put")
 
 
 class Strap(Straddle):
     """Combination of a straddle with a call.  Long 2 calls & 1 put at K."""
+
     def __init__(self, St=None, K=None, price=None):
         super().__init__(St=St, K=K, price=price)
-        self.add_option(K=K, price=price, St=St, kind='call')
+        self.add_option(K=K, price=price, St=St, kind="call")
 
 
 class ShortStraddle(OpStrat):
     """Short-volatility exposure.  Short a put and call, both at K."""
+
     def __init__(self, St=None, K=None, price=None):
         super().__init__(St=St)
         self.K = K
         self.price = price
-        self.add_option(K=K, price=price, St=St, kind='call', pos='short')
-        self.add_option(K=K, price=price, St=St, kind='put', pos='short')
+        self.add_option(K=K, price=price, St=St, kind="call", pos="short")
+        self.add_option(K=K, price=price, St=St, kind="put", pos="short")
 
 
 class Strangle(OpStrat):
@@ -394,15 +457,16 @@ class Strangle(OpStrat):
     - Long K2 (put)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, callprice=None,
-                 putprice=None):
+    def __init__(
+        self, St=None, K1=None, K2=None, callprice=None, putprice=None
+    ):
         super().__init__(St=St)
         self.K1 = K1
         self.K2 = K2
         self.callprice = callprice
         self.putprice = putprice
-        self.add_option(K=K1, price=callprice, St=St, kind='call')
-        self.add_option(K=K2, price=putprice, St=St, kind='put')
+        self.add_option(K=K1, price=callprice, St=St, kind="call")
+        self.add_option(K=K2, price=putprice, St=St, kind="put")
 
 
 class ShortStrangle(OpStrat):
@@ -412,15 +476,16 @@ class ShortStrangle(OpStrat):
     - Long K2 (put)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, callprice=None,
-                 putprice=None):
+    def __init__(
+        self, St=None, K1=None, K2=None, callprice=None, putprice=None
+    ):
         super().__init__(St=St)
         self.K1 = K1
         self.K2 = K2
         self.callprice = callprice
         self.putprice = putprice
-        self.add_option(K=K1, price=callprice, St=St, kind='call', pos='short')
-        self.add_option(K=K2, price=putprice, St=St, kind='put', pos='short')
+        self.add_option(K=K1, price=callprice, St=St, kind="call", pos="short")
+        self.add_option(K=K2, price=putprice, St=St, kind="put", pos="short")
 
 
 class BullSpread(OpStrat):
@@ -432,15 +497,16 @@ class BullSpread(OpStrat):
     - Short K2 (put or call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None,
-                 kind='call'):
+    def __init__(
+        self, St=None, K1=None, K2=None, price1=None, price2=None, kind="call"
+    ):
         super().__init__(St=St)
         self.K1 = K1
         self.K2 = K2
         self.price1 = price1
         self.price2 = price2
-        self.add_option(K=K1, price=price1, St=St, kind=kind, pos='long')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='short')
+        self.add_option(K=K1, price=price1, St=St, kind=kind, pos="long")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="short")
 
 
 class BearSpread(OpStrat):
@@ -452,44 +518,71 @@ class BearSpread(OpStrat):
     - Long K2 (put or call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, price1=None, price2=None,
-                 kind='put'):
+    def __init__(
+        self, St=None, K1=None, K2=None, price1=None, price2=None, kind="put"
+    ):
         super().__init__(St=St)
         self.K2 = K1
         self.K2 = K2
         self.price1 = price1
         self.price2 = price2
-        self.add_option(K=K1, price=price1, St=St, kind=kind, pos='short')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='long')
+        self.add_option(K=K1, price=price1, St=St, kind=kind, pos="short")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="long")
 
 
 class LongPutLadder(BearSpread):
     """Bear put spread combined with selling another lower-strike put."""
-    def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
-                 price2=None, price3=None):
-        super().__init__(St=St, K1=K2, K2=K3, price1=price2,
-                         price2=price3)
+
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        price1=None,
+        price2=None,
+        price3=None,
+    ):
+        super().__init__(St=St, K1=K2, K2=K3, price1=price2, price2=price3)
         self.K1 = K1
         self.price1 = price1
-        self.add_option(K=K1, price=price1, St=St, kind='put', pos='short')
+        self.add_option(K=K1, price=price1, St=St, kind="put", pos="short")
 
 
 class ShortPutLadder(BearSpread):
     """Bull put spread combined with buying another lower-strike put."""
-    def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
-                 price2=None, price3=None):
-        super().__init__(St=St, K1=K2, K2=K3, price1=price2, price2=price3,
-                         kind='put')
+
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        price1=None,
+        price2=None,
+        price3=None,
+    ):
+        super().__init__(
+            St=St, K1=K2, K2=K3, price1=price2, price2=price3, kind="put"
+        )
         self.K1 = K1
         self.price1 = price1
-        self.add_option(K=K1, price=price1, St=St, kind='put', pos='long')
+        self.add_option(K=K1, price=price1, St=St, kind="put", pos="long")
 
 
 class _Butterfly(OpStrat):
-    def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
-                 price2=None, price3=None):
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        price1=None,
+        price2=None,
+        price3=None,
+    ):
         if not np.allclose(np.mean([K1, K3]), K2):
-            warnings.warn('specified strikes are not equidistant.')
+            warnings.warn("specified strikes are not equidistant.")
         super().__init__(St=St)
         self.K1 = K1
         self.K2 = K2
@@ -507,15 +600,31 @@ class LongButterfly(_Butterfly):
     - Long K3 (put or call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
-                 price2=None, price3=None, kind='call'):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, price1=price1,
-                         price2=price2, price3=price3)
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        price1=None,
+        price2=None,
+        price3=None,
+        kind="call",
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+        )
         self.kind = kind
-        self.add_option(K=K1, price=price1, St=St, kind=kind, pos='long')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='short')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='short')
-        self.add_option(K=K3, price=price3, St=St, kind=kind, pos='long')
+        self.add_option(K=K1, price=price1, St=St, kind=kind, pos="long")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="short")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="short")
+        self.add_option(K=K3, price=price3, St=St, kind=kind, pos="long")
 
 
 class ShortButterfly(_Butterfly):
@@ -526,15 +635,31 @@ class ShortButterfly(_Butterfly):
     - Short K3 (put or call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
-                 price2=None, price3=None, kind='call'):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, price1=price1,
-                         price2=price2, price3=price3)
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        price1=None,
+        price2=None,
+        price3=None,
+        kind="call",
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+        )
         self.kind = kind
-        self.add_option(K=K1, price=price1, St=St, kind=kind, pos='short')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='long')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='long')
-        self.add_option(K=K3, price=price3, St=St, kind=kind, pos='short')
+        self.add_option(K=K1, price=price1, St=St, kind=kind, pos="short")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="long")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="long")
+        self.add_option(K=K3, price=price3, St=St, kind=kind, pos="short")
 
 
 class LongIronButterfly(_Butterfly):
@@ -545,14 +670,29 @@ class LongIronButterfly(_Butterfly):
     - Short K3 (call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
-                 price2=None, price3=None):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, price1=price1,
-                         price2=price2, price3=price3)
-        self.add_option(K=K1, price=price1, St=St, kind='put', pos='short')
-        self.add_option(K=K2, price=price2, St=St, kind='put', pos='long')
-        self.add_option(K=K2, price=price2, St=St, kind='call', pos='long')
-        self.add_option(K=K3, price=price3, St=St, kind='call', pos='short')
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        price1=None,
+        price2=None,
+        price3=None,
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+        )
+        self.add_option(K=K1, price=price1, St=St, kind="put", pos="short")
+        self.add_option(K=K2, price=price2, St=St, kind="put", pos="long")
+        self.add_option(K=K2, price=price2, St=St, kind="call", pos="long")
+        self.add_option(K=K3, price=price3, St=St, kind="call", pos="short")
 
 
 class ShortIronButterfly(_Butterfly):
@@ -563,21 +703,46 @@ class ShortIronButterfly(_Butterfly):
     - Long K3 (call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, price1=None,
-                 price2=None, price3=None):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, price1=price1,
-                         price2=price2, price3=price3)
-        self.add_option(K=K1, price=price1, St=St, kind='put', pos='long')
-        self.add_option(K=K2, price=price2, St=St, kind='put', pos='short')
-        self.add_option(K=K2, price=price2, St=St, kind='call', pos='short')
-        self.add_option(K=K3, price=price3, St=St, kind='call', pos='long')
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        price1=None,
+        price2=None,
+        price3=None,
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+        )
+        self.add_option(K=K1, price=price1, St=St, kind="put", pos="long")
+        self.add_option(K=K2, price=price2, St=St, kind="put", pos="short")
+        self.add_option(K=K2, price=price2, St=St, kind="call", pos="short")
+        self.add_option(K=K3, price=price3, St=St, kind="call", pos="long")
 
 
 class _Condor(OpStrat):
-    def __init__(self, St=None, K1=None, K2=None, K3=None, K4=None,
-                 price1=None, price2=None, price3=None, price4=None):
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        K4=None,
+        price1=None,
+        price2=None,
+        price3=None,
+        price4=None,
+    ):
         if not np.allclose(K2 - K1, K4 - K3):
-            warnings.warn('specified wings are not equidistant.')
+            warnings.warn("specified wings are not equidistant.")
         super().__init__(St=St)
         self.K1 = K1
         self.K2 = K2
@@ -597,17 +762,35 @@ class LongCondor(_Condor):
     - Long K4 (put or call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, K4=None,
-                 price1=None, price2=None, price3=None, price4=None,
-                 kind='call'):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, K4=K4,
-                         price1=price1, price2=price2, price3=price3,
-                         price4=price4)
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        K4=None,
+        price1=None,
+        price2=None,
+        price3=None,
+        price4=None,
+        kind="call",
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            K4=K4,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+            price4=price4,
+        )
         self.kind = kind
-        self.add_option(K=K1, price=price1, St=St, kind=kind, pos='long')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='short')
-        self.add_option(K=K3, price=price3, St=St, kind=kind, pos='short')
-        self.add_option(K=K4, price=price4, St=St, kind=kind, pos='long')
+        self.add_option(K=K1, price=price1, St=St, kind=kind, pos="long")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="short")
+        self.add_option(K=K3, price=price3, St=St, kind=kind, pos="short")
+        self.add_option(K=K4, price=price4, St=St, kind=kind, pos="long")
 
 
 class ShortCondor(_Condor):
@@ -618,17 +801,35 @@ class ShortCondor(_Condor):
     - Short K4 (put or call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, K4=None,
-                 price1=None, price2=None, price3=None, price4=None,
-                 kind='call'):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, K4=K4,
-                         price1=price1, price2=price2, price3=price3,
-                         price4=price4)
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        K4=None,
+        price1=None,
+        price2=None,
+        price3=None,
+        price4=None,
+        kind="call",
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            K4=K4,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+            price4=price4,
+        )
         self.kind = kind
-        self.add_option(K=K1, price=price1, St=St, kind=kind, pos='short')
-        self.add_option(K=K2, price=price2, St=St, kind=kind, pos='long')
-        self.add_option(K=K3, price=price3, St=St, kind=kind, pos='long')
-        self.add_option(K=K4, price=price4, St=St, kind=kind, pos='short')
+        self.add_option(K=K1, price=price1, St=St, kind=kind, pos="short")
+        self.add_option(K=K2, price=price2, St=St, kind=kind, pos="long")
+        self.add_option(K=K3, price=price3, St=St, kind=kind, pos="long")
+        self.add_option(K=K4, price=price4, St=St, kind=kind, pos="short")
 
 
 class LongIronCondor(_Condor):
@@ -640,15 +841,33 @@ class LongIronCondor(_Condor):
     - Short K4 (call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, K4=None,
-                 price1=None, price2=None, price3=None, price4=None):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, K4=K4,
-                         price1=price1, price2=price2, price3=price3,
-                         price4=price4)
-        self.add_option(K=K1, price=price1, St=St, kind='put', pos='short')
-        self.add_option(K=K2, price=price2, St=St, kind='put', pos='long')
-        self.add_option(K=K3, price=price3, St=St, kind='call', pos='long')
-        self.add_option(K=K4, price=price4, St=St, kind='call', pos='short')
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        K4=None,
+        price1=None,
+        price2=None,
+        price3=None,
+        price4=None,
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            K4=K4,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+            price4=price4,
+        )
+        self.add_option(K=K1, price=price1, St=St, kind="put", pos="short")
+        self.add_option(K=K2, price=price2, St=St, kind="put", pos="long")
+        self.add_option(K=K3, price=price3, St=St, kind="call", pos="long")
+        self.add_option(K=K4, price=price4, St=St, kind="call", pos="short")
 
 
 class ShortIronCondor(_Condor):
@@ -660,12 +879,30 @@ class ShortIronCondor(_Condor):
     - Long K4 (call)
     """
 
-    def __init__(self, St=None, K1=None, K2=None, K3=None, K4=None,
-                 price1=None, price2=None, price3=None, price4=None):
-        super().__init__(St=St, K1=K1, K2=K2, K3=K3, K4=K4,
-                         price1=price1, price2=price2, price3=price3,
-                         price4=price4)
-        self.add_option(K=K1, price=price1, St=St, kind='put', pos='long')
-        self.add_option(K=K2, price=price2, St=St, kind='put', pos='short')
-        self.add_option(K=K3, price=price3, St=St, kind='call', pos='short')
-        self.add_option(K=K4, price=price4, St=St, kind='call', pos='long')
+    def __init__(
+        self,
+        St=None,
+        K1=None,
+        K2=None,
+        K3=None,
+        K4=None,
+        price1=None,
+        price2=None,
+        price3=None,
+        price4=None,
+    ):
+        super().__init__(
+            St=St,
+            K1=K1,
+            K2=K2,
+            K3=K3,
+            K4=K4,
+            price1=price1,
+            price2=price2,
+            price3=price3,
+            price4=price4,
+        )
+        self.add_option(K=K1, price=price1, St=St, kind="put", pos="long")
+        self.add_option(K=K2, price=price2, St=St, kind="put", pos="short")
+        self.add_option(K=K3, price=price3, St=St, kind="call", pos="short")
+        self.add_option(K=K4, price=price4, St=St, kind="call", pos="long")

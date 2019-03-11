@@ -16,9 +16,15 @@ load_retaildata
     Load and clean retail trade data from census.gov.
 """
 
-__author__ = 'Brad Solomon <brad.solomon.1124@gmail.com>'
-__all__ = ['load_factors', 'load_industries', 'load_rates', 'load_shiller',
-           'load_rf', 'load_13f']
+__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
+__all__ = [
+    "load_factors",
+    "load_industries",
+    "load_rates",
+    "load_shiller",
+    "load_rf",
+    "load_13f",
+]
 
 import itertools
 
@@ -30,7 +36,7 @@ import requests
 import xmltodict
 
 # Default start date for web-retrieved time series.
-DSTART = '1950-01'
+DSTART = "1950-01"
 
 
 def load_13f(url):
@@ -60,13 +66,15 @@ def load_13f(url):
     """
 
     resp = requests.get(url).text
-    data = xmltodict.parse(resp)['informationTable']['infoTable']
-    df = pd.DataFrame(data).drop(['shrsOrPrnAmt', 'investmentDiscretion'],
-                                 axis=1)
-    df['votingAuthority'] = df['votingAuthority'].apply(lambda d: d['Sole'])
-    df.loc[:, 'value'] = pd.to_numeric(df['value'], errors='coerce')
-    df.loc[:, 'votingAuthority'] = pd.to_numeric(df['votingAuthority'],
-                                                 errors='coerce')
+    data = xmltodict.parse(resp)["informationTable"]["infoTable"]
+    df = pd.DataFrame(data).drop(
+        ["shrsOrPrnAmt", "investmentDiscretion"], axis=1
+    )
+    df["votingAuthority"] = df["votingAuthority"].apply(lambda d: d["Sole"])
+    df.loc[:, "value"] = pd.to_numeric(df["value"], errors="coerce")
+    df.loc[:, "votingAuthority"] = pd.to_numeric(
+        df["votingAuthority"], errors="coerce"
+    )
     return df
 
 
@@ -131,114 +139,140 @@ def load_factors():
 
     # MKT, SMB, HML, RMW, CMA, RF, UMD, STR, LTR
     facs = [
-        'F-F_Research_Data_5_Factors_2x3',
-        'F-F_Momentum_Factor',
-        'F-F_ST_Reversal_Factor',
-        'F-F_LT_Reversal_Factor'
-        ]
+        "F-F_Research_Data_5_Factors_2x3",
+        "F-F_Momentum_Factor",
+        "F-F_ST_Reversal_Factor",
+        "F-F_LT_Reversal_Factor",
+    ]
 
     for fac in facs:
-        tgt.append(pdr.DataReader(fac, 'famafrench', DSTART)[0])
+        tgt.append(pdr.DataReader(fac, "famafrench", DSTART)[0])
 
     # BETA, ACC, VAR, IVAR require some manipulation to compute returns
     # in the dual-sort method of Fama-French
-    for i in ['BETA', 'AC', 'VAR', 'RESVAR']:
-        ser = pdr.DataReader('25_Portfolios_ME_' + i + '_5x5', 'famafrench',
-                             DSTART)[0]
-        ser = ser.iloc[:, [0, 5, 10, 15, 20]].mean(axis=1)\
-            - ser.iloc[:, [4, 9, 14, 19, 24]].mean(axis=1)
+    for i in ["BETA", "AC", "VAR", "RESVAR"]:
+        ser = pdr.DataReader(
+            "25_Portfolios_ME_" + i + "_5x5", "famafrench", DSTART
+        )[0]
+        ser = ser.iloc[:, [0, 5, 10, 15, 20]].mean(axis=1) - ser.iloc[
+            :, [4, 9, 14, 19, 24]
+        ].mean(axis=1)
         ser = ser.rename(i)
         tgt.append(ser)
 
     # E/P, CF/P, D/P (univariate sorts, quintile spreads)
-    for i in ['E-P', 'CF-P', 'D-P']:
-        ser = pdr.DataReader('Portfolios_Formed_on_' + i, 'famafrench',
-                             DSTART)[0]
-        ser = ser.loc[:, 'Hi 20'] - ser.loc[:, 'Lo 20']
+    for i in ["E-P", "CF-P", "D-P"]:
+        ser = pdr.DataReader(
+            "Portfolios_Formed_on_" + i, "famafrench", DSTART
+        )[0]
+        ser = ser.loc[:, "Hi 20"] - ser.loc[:, "Lo 20"]
         ser = ser.rename(i)
         tgt.append(ser)
 
-    tgt = [df.to_timestamp(how='end') for df in tgt]
+    tgt = [df.to_timestamp(how="end") for df in tgt]
 
     # BAB, QMJ, HMLD
     # TODO: performance is poor here, runtime is eaten up by these 3
-    links = {'BAB': 'http://bit.ly/2hWyaG8',
-             'QMJ': 'http://bit.ly/2hUBSgF',
-             'HMLD': 'http://bit.ly/2hdVb7G'}
+    links = {
+        "BAB": "http://bit.ly/2hWyaG8",
+        "QMJ": "http://bit.ly/2hUBSgF",
+        "HMLD": "http://bit.ly/2hdVb7G",
+    }
     for key, value in links.items():
-        ser = pd.read_excel(value, header=18, index_col=0)['USA'] * 100
+        ser = pd.read_excel(value, header=18, index_col=0)["USA"] * 100
         ser = ser.rename(key)
         tgt.append(ser)
 
     # Lookback straddles
-    link = 'http://faculty.fuqua.duke.edu/~dah7/DataLibrary/TF-Fac.xls'
+    link = "http://faculty.fuqua.duke.edu/~dah7/DataLibrary/TF-Fac.xls"
     straddles = pd.read_excel(link, header=14, index_col=0)
-    straddles.index = pd.DatetimeIndex(straddles.index.astype(str) + '01') \
-        + offsets.MonthEnd(1)
-    straddles = straddles * 100.
+    straddles.index = pd.DatetimeIndex(
+        straddles.index.astype(str) + "01"
+    ) + offsets.MonthEnd(1)
+    straddles = straddles * 100.0
     tgt.append(straddles)
 
     # LIQ
-    link = 'http://bit.ly/2pn2oBK'
-    liq = pd.read_csv(link, skiprows=14, delim_whitespace=True, header=None,
-                      usecols=[0, 3], index_col=0, names=['date', 'LIQ'])
-    liq.index = pd.DatetimeIndex(liq.index.astype(str) + '01') \
-        + offsets.MonthEnd(1)
-    liq = liq.replace(-99, np.nan) * 100.
+    link = "http://bit.ly/2pn2oBK"
+    liq = pd.read_csv(
+        link,
+        skiprows=14,
+        delim_whitespace=True,
+        header=None,
+        usecols=[0, 3],
+        index_col=0,
+        names=["date", "LIQ"],
+    )
+    liq.index = pd.DatetimeIndex(
+        liq.index.astype(str) + "01"
+    ) + offsets.MonthEnd(1)
+    liq = liq.replace(-99, np.nan) * 100.0
     tgt.append(liq)
 
     # USD, HY
-    fred = pdr.DataReader(['DTWEXB', 'BAMLH0A0HYM2'], 'fred', DSTART)
-    fred = (fred.asfreq('D', method='ffill')
-            .fillna(method='ffill')
-            .asfreq('M'))
-    fred.loc[:, 'DTWEXB'] = fred['DTWEXB'].pct_change() * 100.
-    fred.loc[:, 'BAMLH0A0HYM2'] = fred['BAMLH0A0HYM2'].diff()
+    fred = pdr.DataReader(["DTWEXB", "BAMLH0A0HYM2"], "fred", DSTART)
+    fred = fred.asfreq("D", method="ffill").fillna(method="ffill").asfreq("M")
+    fred.loc[:, "DTWEXB"] = fred["DTWEXB"].pct_change() * 100.0
+    fred.loc[:, "BAMLH0A0HYM2"] = fred["BAMLH0A0HYM2"].diff()
     tgt.append(fred)
 
     # PUT, BXM, RXM (CBOE options strategy indices)
-    link1 = 'http://www.cboe.com/micro/put/put_86-06.xls'
-    link2 = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/putdailyprice.csv'  # noqa
+    link1 = "http://www.cboe.com/micro/put/put_86-06.xls"
+    link2 = "http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/putdailyprice.csv"  # noqa
 
-    put1 = pd.read_excel(link1, index_col=0, skiprows=6, header=None)\
-        .rename_axis('DATE')
-    put2 = pd.read_csv(link2, index_col=0, parse_dates=True, skiprows=7,
-                       header=None).rename_axis('DATE')
-    put = pd.concat((put1, put2))\
-        .rename(columns={1: 'PUT'})\
-        .iloc[:, 0]\
-        .asfreq('D', method='ffill')\
-        .fillna(method='ffill')\
-        .asfreq('M')\
-        .pct_change() * 100.
+    put1 = pd.read_excel(
+        link1, index_col=0, skiprows=6, header=None
+    ).rename_axis("DATE")
+    put2 = pd.read_csv(
+        link2, index_col=0, parse_dates=True, skiprows=7, header=None
+    ).rename_axis("DATE")
+    put = (
+        pd.concat((put1, put2))
+        .rename(columns={1: "PUT"})
+        .iloc[:, 0]
+        .asfreq("D", method="ffill")
+        .fillna(method="ffill")
+        .asfreq("M")
+        .pct_change()
+        * 100.0
+    )
     tgt.append(put)
 
-    link1 = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/bxmarchive.csv'  # noqa
-    link2 = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/bxmcurrent.csv'  # noqa
+    link1 = "http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/bxmarchive.csv"  # noqa
+    link2 = "http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/bxmcurrent.csv"  # noqa
 
-    bxm1 = pd.read_csv(link1, index_col=0, parse_dates=True, skiprows=5,
-                       header=None).rename_axis('DATE')
-    bxm2 = pd.read_csv(link2, index_col=0, parse_dates=True, skiprows=4,
-                       header=None).rename_axis('DATE')
-    bxm = pd.concat((bxm1, bxm2))\
-        .rename(columns={1: 'BXM'})\
-        .iloc[:, 0]\
-        .asfreq('D', method='ffill')\
-        .fillna(method='ffill')\
-        .asfreq('M')\
-        .pct_change() * 100.
+    bxm1 = pd.read_csv(
+        link1, index_col=0, parse_dates=True, skiprows=5, header=None
+    ).rename_axis("DATE")
+    bxm2 = pd.read_csv(
+        link2, index_col=0, parse_dates=True, skiprows=4, header=None
+    ).rename_axis("DATE")
+    bxm = (
+        pd.concat((bxm1, bxm2))
+        .rename(columns={1: "BXM"})
+        .iloc[:, 0]
+        .asfreq("D", method="ffill")
+        .fillna(method="ffill")
+        .asfreq("M")
+        .pct_change()
+        * 100.0
+    )
     tgt.append(bxm)
 
-    link = 'http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/rxm_historical.csv'  # noqa
-    rxm = pd.read_csv(link, index_col=0, parse_dates=True, skiprows=2,
-                      header=None)\
-        .rename(columns={1: 'RXM'})\
-        .rename_axis('DATE')\
-        .iloc[:, 0]\
-        .asfreq('D', method='ffill')\
-        .fillna(method='ffill')\
-        .asfreq('M')\
-        .pct_change() * 100.
+    link = "http://www.cboe.com/publish/scheduledtask/mktdata/datahouse/rxm_historical.csv"  # noqa
+    rxm = (
+        pd.read_csv(
+            link, index_col=0, parse_dates=True, skiprows=2, header=None
+        )
+        .rename(columns={1: "RXM"})
+        .rename_axis("DATE")
+        .iloc[:, 0]
+        .asfreq("D", method="ffill")
+        .fillna(method="ffill")
+        .asfreq("M")
+        .pct_change()
+        * 100.0
+    )
     tgt.append(rxm)
 
     # Clean up data retrieved above
@@ -246,30 +280,30 @@ def load_factors():
 
     factors = pd.concat(tgt, axis=1).round(2)
     newnames = {
-        'Mkt-RF': 'MKT',
-        'Mom   ': 'UMD',
-        'ST_Rev': 'STR',
-        'LT_Rev': 'LTR',
-        'RESVAR': 'IVAR',
-        'AC': 'ACC',
-        'PTFSBD': 'BDLB',
-        'PTFSFX': 'FXLB',
-        'PTFSCOM': 'CMLB',
-        'PTFSIR': 'IRLB',
-        'PTFSSTK': 'STLB',
-        'DTWEXB': 'USD',
-        'BAMLH0A0HYM2': 'HY'
-        }
+        "Mkt-RF": "MKT",
+        "Mom   ": "UMD",
+        "ST_Rev": "STR",
+        "LT_Rev": "LTR",
+        "RESVAR": "IVAR",
+        "AC": "ACC",
+        "PTFSBD": "BDLB",
+        "PTFSFX": "FXLB",
+        "PTFSCOM": "CMLB",
+        "PTFSIR": "IRLB",
+        "PTFSSTK": "STLB",
+        "DTWEXB": "USD",
+        "BAMLH0A0HYM2": "HY",
+    }
     factors.rename(columns=newnames, inplace=True)
 
     # Get last valid RF date; returns will be constrained to this date
-    factors = factors[:factors['RF'].last_valid_index()]
+    factors = factors[: factors["RF"].last_valid_index()]
 
     # Subtract RF for long-only factors
-    subtract = ['HY', 'PUT', 'BXM', 'RXM']
+    subtract = ["HY", "PUT", "BXM", "RXM"]
 
     for i in subtract:
-        factors.loc[:, i] = factors[i] - factors['RF']
+        factors.loc[:, i] = factors[i] - factors["RF"]
 
     return factors
 
@@ -299,16 +333,16 @@ def load_industries():
     """
 
     n = [5, 10, 12, 17, 30, 38, 48]
-    port = ('%s_Industry_Portfolios' % i for i in n)
+    port = ("%s_Industry_Portfolios" % i for i in n)
     rets = []
     for p in port:
         ret = pdr.get_data_famafrench(p, start=DSTART)[0]
-        rets.append(ret.to_timestamp(how='end', copy=False))
+        rets.append(ret.to_timestamp(how="end", copy=False))
     industries = dict(zip(n, rets))
     return industries
 
 
-def load_rates(freq='D'):
+def load_rates(freq="D"):
     """Load interest rates from https://fred.stlouisfed.org/.
 
     Parameters
@@ -336,53 +370,64 @@ def load_rates(freq='D'):
 
     # Nested dictionaries of symbols from fred.stlouisfed.org
     nom = {
-        'D': ['DGS%sMO' % m for m in months] + ['DGS%s' % y for y in years],
-        'W': ['WGS%sMO' % m for m in months] + ['WGS%sYR' % y for y in years],
-        'M': ['GS%sM' % m for m in months] + ['GS%s' % y for y in years]
-        }
+        "D": ["DGS%sMO" % m for m in months] + ["DGS%s" % y for y in years],
+        "W": ["WGS%sMO" % m for m in months] + ["WGS%sYR" % y for y in years],
+        "M": ["GS%sM" % m for m in months] + ["GS%s" % y for y in years],
+    }
 
     tips = {
-        'D': ['DFII%s' % y for y in years[3:7]],
-        'W': ['WFII%s' % y for y in years[3:7]],
-        'M': ['FII%s' % y for y in years[3:7]]
-        }
+        "D": ["DFII%s" % y for y in years[3:7]],
+        "W": ["WFII%s" % y for y in years[3:7]],
+        "M": ["FII%s" % y for y in years[3:7]],
+    }
 
     fcp = {
-        'D': ['DCPF1M', 'DCPF2M', 'DCPF3M'],
-        'W': ['WCPF1M', 'WCPF2M', 'WCPF3M'],
-        'M': ['CPF1M', 'CPF2M', 'CPF3M']
-        }
+        "D": ["DCPF1M", "DCPF2M", "DCPF3M"],
+        "W": ["WCPF1M", "WCPF2M", "WCPF3M"],
+        "M": ["CPF1M", "CPF2M", "CPF3M"],
+    }
 
     nfcp = {
-        'D': ['DCPN30', 'DCPN2M', 'DCPN3M'],
-        'W': ['WCPN1M', 'WCPN2M', 'WCPN3M'],
-        'M': ['CPN1M', 'CPN2M', 'CPN3M']
-        }
+        "D": ["DCPN30", "DCPN2M", "DCPN3M"],
+        "W": ["WCPN1M", "WCPN2M", "WCPN3M"],
+        "M": ["CPN1M", "CPN2M", "CPN3M"],
+    }
 
     short = {
-        'D': ['DFF', 'DPRIME', 'DPCREDIT'],
-        'W': ['FF', 'WPRIME', 'WPCREDIT'],
-        'M': ['FEDFUNDS', 'MPRIME', 'MPCREDIT']
-        }
+        "D": ["DFF", "DPRIME", "DPCREDIT"],
+        "W": ["FF", "WPRIME", "WPCREDIT"],
+        "M": ["FEDFUNDS", "MPRIME", "MPCREDIT"],
+    }
 
-    rates = list(itertools.chain.from_iterable([d[freq] for d in
-                 [nom, tips, fcp, nfcp, short]]))
-    rates = pdr.DataReader(rates, 'fred', start=DSTART)
+    rates = list(
+        itertools.chain.from_iterable(
+            [d[freq] for d in [nom, tips, fcp, nfcp, short]]
+        )
+    )
+    rates = pdr.DataReader(rates, "fred", start=DSTART)
 
-    l1 = ['Nominal'] * 11 + ['TIPS'] * 4 + ['Fncl CP'] * 3 \
-        + ['Non-Fncl CP'] * 3 + ['Short Rates'] * 3
+    l1 = (
+        ["Nominal"] * 11
+        + ["TIPS"] * 4
+        + ["Fncl CP"] * 3
+        + ["Non-Fncl CP"] * 3
+        + ["Short Rates"] * 3
+    )
 
-    l2 = ['%sm' % m for m in months] + ['%sy' % y for y in years] \
-        + ['%sy' % y for y in years[3:7]] \
-        + 2 * ['%sm' % m for m in range(1, 4)] \
-        + ['Fed Funds', 'Prime Rate', 'Primary Credit']
+    l2 = (
+        ["%sm" % m for m in months]
+        + ["%sy" % y for y in years]
+        + ["%sy" % y for y in years[3:7]]
+        + 2 * ["%sm" % m for m in range(1, 4)]
+        + ["Fed Funds", "Prime Rate", "Primary Credit"]
+    )
 
     rates.columns = pd.MultiIndex.from_arrays([l1, l2])
 
     return rates
 
 
-def load_rf(freq='M'):
+def load_rf(freq="M"):
     """Build a risk-free rate return series using 3-month US T-bill yields.
 
     The 3-Month Treasury Bill: Secondary Market Rate from the Federal Reserve
@@ -456,28 +501,35 @@ def load_rf(freq='M'):
       September 2008.
     """
 
-    freqs = 'DWMQA'
+    freqs = "DWMQA"
     freq = freq.upper()
     if freq not in freqs:
-        raise ValueError('`freq` must be either a single element or subset'
-                         ' from %s, case-insensitive' % freqs)
+        raise ValueError(
+            "`freq` must be either a single element or subset"
+            " from %s, case-insensitive" % freqs
+        )
 
     # Load daily 3-Month Treasury Bill: Secondary Market Rate.
     # Note that this is on discount basis and will be converted to BEY.
     # Periodicity is daily.
-    rates = pdr.DataReader('DTB3', 'fred', DSTART)\
-        .mul(0.01)\
-        .asfreq('D', method='ffill')\
-        .fillna(method='ffill')\
+    rates = (
+        pdr.DataReader("DTB3", "fred", DSTART)
+        .mul(0.01)
+        .asfreq("D", method="ffill")
+        .fillna(method="ffill")
         .squeeze()
+    )
 
     # Algebra doesn't 'work' on DateOffsets, don't simplify here!
     minus_one_month = offsets.MonthEnd(-1)
     plus_three_months = offsets.MonthEnd(3)
     trigger = rates.index.is_month_end
     dtm_old = rates.index + minus_one_month + plus_three_months - rates.index
-    dtm_new = rates.index.where(trigger, rates.index + minus_one_month) \
-        + plus_three_months - rates.index
+    dtm_new = (
+        rates.index.where(trigger, rates.index + minus_one_month)
+        + plus_three_months
+        - rates.index
+    )
 
     # This does 2 things in one step:
     # (1) convert discount yield to BEY
@@ -490,7 +542,7 @@ def load_rf(freq='M'):
     res = p_old.pct_change().where(trigger, p_new.pct_change()).dropna()
     # TODO: For purpose of using in TSeries, we should drop upsampled
     #       periods where we don't have the full period constituents.
-    return res.add(1.).resample(freq).prod().sub(1.)
+    return res.add(1.0).resample(freq).prod().sub(1.0)
 
 
 def load_shiller():
@@ -520,14 +572,26 @@ def load_shiller():
         http://www.econ.yale.edu/~shiller/data.htm
     """
 
-    xls = 'http://www.econ.yale.edu/~shiller/data/ie_data.xls'
-    cols = ['date', 'sp50p', 'sp50d', 'sp50e', 'cpi', 'frac', 'real_rate',
-            'real_sp50p', 'real_sp50d', 'real_sp50e', 'cape']
-    iedata = pd.read_excel(xls, sheet_name='Data', skiprows=7,
-                           skip_footer=1, names=cols).drop('frac', axis=1)
-    dt = iedata['date'].astype(str).str.replace('.', '') + '01'
-    iedata['date'] = pd.to_datetime(dt, format="%Y%m%d") + offsets.MonthEnd()
-    return iedata.set_index('date')
+    xls = "http://www.econ.yale.edu/~shiller/data/ie_data.xls"
+    cols = [
+        "date",
+        "sp50p",
+        "sp50d",
+        "sp50e",
+        "cpi",
+        "frac",
+        "real_rate",
+        "real_sp50p",
+        "real_sp50d",
+        "real_sp50e",
+        "cape",
+    ]
+    iedata = pd.read_excel(
+        xls, sheet_name="Data", skiprows=7, skip_footer=1, names=cols
+    ).drop("frac", axis=1)
+    dt = iedata["date"].astype(str).str.replace(".", "") + "01"
+    iedata["date"] = pd.to_datetime(dt, format="%Y%m%d") + offsets.MonthEnd()
+    return iedata.set_index("date")
 
 
 def load_retaildata():
@@ -536,89 +600,58 @@ def load_retaildata():
     # indiv = 'https://www.census.gov/retail/marts/www/timeseries.html'
 
     db = {
-        'Auto, other Motor Vehicle':
-        'https://www.census.gov/retail/marts/www/adv441x0.txt',
-
-        'Building Material and Garden Equipment and Supplies Dealers':
-        'https://www.census.gov/retail/marts/www/adv44400.txt',
-
-        'Clothing and Clothing Accessories Stores':
-        'https://www.census.gov/retail/marts/www/adv44800.txt',
-
-        'Dept. Stores (ex. leased depts)':
-        'https://www.census.gov/retail/marts/www/adv45210.txt',
-
-        'Electronics and Appliance Stores':
-        'https://www.census.gov/retail/marts/www/adv44300.txt',
-
-        'Food Services and Drinking Places':
-        'https://www.census.gov/retail/marts/www/adv72200.txt',
-
-        'Food and Beverage Stores':
-        'https://www.census.gov/retail/marts/www/adv44500.txt',
-
-        'Furniture and Home Furnishings Stores':
-        'https://www.census.gov/retail/marts/www/adv44200.txt',
-
-        'Gasoline Stations':
-        'https://www.census.gov/retail/marts/www/adv44700.txt',
-
-        'General Merchandise Stores':
-        'https://www.census.gov/retail/marts/www/adv45200.txt',
-
-        'Grocery Stores':
-        'https://www.census.gov/retail/marts/www/adv44510.txt',
-
-        'Health and Personal Care Stores':
-        'https://www.census.gov/retail/marts/www/adv44600.txt',
-
-        'Miscellaneous Store Retailers':
-        'https://www.census.gov/retail/marts/www/adv45300.txt',
-
-        'Motor Vehicle and Parts Dealers':
-        'https://www.census.gov/retail/marts/www/adv44100.txt',
-
-        'Nonstore Retailers':
-        'https://www.census.gov/retail/marts/www/adv45400.txt',
-
-        'Retail and Food Services, total':
-        'https://www.census.gov/retail/marts/www/adv44x72.txt',
-
-        'Retail, total':
-        'https://www.census.gov/retail/marts/www/adv44000.txt',
-
-        'Sporting Goods, Hobby, Book, and Music Stores':
-        'https://www.census.gov/retail/marts/www/adv45100.txt',
-
-        'Total (excl. Motor Vehicle)':
-        'https://www.census.gov/retail/marts/www/adv44y72.txt',
-
-        'Retail (excl. Motor Vehicle and Parts Dealers)':
-        'https://www.census.gov/retail/marts/www/adv4400a.txt'
-        }
+        "Auto, other Motor Vehicle": "https://www.census.gov/retail/marts/www/adv441x0.txt",
+        "Building Material and Garden Equipment and Supplies Dealers": "https://www.census.gov/retail/marts/www/adv44400.txt",
+        "Clothing and Clothing Accessories Stores": "https://www.census.gov/retail/marts/www/adv44800.txt",
+        "Dept. Stores (ex. leased depts)": "https://www.census.gov/retail/marts/www/adv45210.txt",
+        "Electronics and Appliance Stores": "https://www.census.gov/retail/marts/www/adv44300.txt",
+        "Food Services and Drinking Places": "https://www.census.gov/retail/marts/www/adv72200.txt",
+        "Food and Beverage Stores": "https://www.census.gov/retail/marts/www/adv44500.txt",
+        "Furniture and Home Furnishings Stores": "https://www.census.gov/retail/marts/www/adv44200.txt",
+        "Gasoline Stations": "https://www.census.gov/retail/marts/www/adv44700.txt",
+        "General Merchandise Stores": "https://www.census.gov/retail/marts/www/adv45200.txt",
+        "Grocery Stores": "https://www.census.gov/retail/marts/www/adv44510.txt",
+        "Health and Personal Care Stores": "https://www.census.gov/retail/marts/www/adv44600.txt",
+        "Miscellaneous Store Retailers": "https://www.census.gov/retail/marts/www/adv45300.txt",
+        "Motor Vehicle and Parts Dealers": "https://www.census.gov/retail/marts/www/adv44100.txt",
+        "Nonstore Retailers": "https://www.census.gov/retail/marts/www/adv45400.txt",
+        "Retail and Food Services, total": "https://www.census.gov/retail/marts/www/adv44x72.txt",
+        "Retail, total": "https://www.census.gov/retail/marts/www/adv44000.txt",
+        "Sporting Goods, Hobby, Book, and Music Stores": "https://www.census.gov/retail/marts/www/adv45100.txt",
+        "Total (excl. Motor Vehicle)": "https://www.census.gov/retail/marts/www/adv44y72.txt",
+        "Retail (excl. Motor Vehicle and Parts Dealers)": "https://www.census.gov/retail/marts/www/adv4400a.txt",
+    }
 
     dct = {}
     for key, value in db.items():
-        data = pd.read_csv(value, skiprows=5, skip_blank_lines=True,
-                           header=None, sep='\s+', index_col=0)
+        data = pd.read_csv(
+            value,
+            skiprows=5,
+            skip_blank_lines=True,
+            header=None,
+            sep="\s+",
+            index_col=0,
+        )
         try:
-            cut = data.index.get_loc('SEASONAL')
+            cut = data.index.get_loc("SEASONAL")
         except KeyError:
-            cut = data.index.get_loc('NO')
+            cut = data.index.get_loc("NO")
         data = data.iloc[:cut]
-        data = data.apply(lambda col: pd.to_numeric(col, downcast='float'))
+        data = data.apply(lambda col: pd.to_numeric(col, downcast="float"))
         data = data.stack()
         year = data.index.get_level_values(0)
         month = data.index.get_level_values(1)
-        idx = pd.to_datetime({'year': year, 'month': month, 'day': 1}) \
-            + offsets.MonthEnd(1)
+        idx = pd.to_datetime(
+            {"year": year, "month": month, "day": 1}
+        ) + offsets.MonthEnd(1)
         data.index = idx
         data.name = key
         dct[key] = data
 
     sales = pd.DataFrame(dct)
-    sales = sales.reindex(pd.date_range(sales.index[0],
-                          sales.index[-1], freq='M'))
+    sales = sales.reindex(
+        pd.date_range(sales.index[0], sales.index[-1], freq="M")
+    )
     # TODO: account for any skipped months; could specify a DateOffset to
     # `freq` param of `pandas.DataFrame.shift`
     yoy = sales.pct_change(periods=12)

@@ -4,6 +4,11 @@ Changes prior to version 0.2.0 are untracked.
 
 Versioning attempts to follow the specifications laid out in [PEP 440](https://www.python.org/dev/peps/pep-0440/).
 
+## 1.2.5
+
+- Bugfix: fix a false-positive ValueError (see d59e7ca)
+- Lint entire package with `black.py`
+
 ## 1.2.4
 
 - Bugfix: corrected a misspelled method in `returns.py` (see 6f2970c)

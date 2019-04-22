@@ -4,8 +4,7 @@ from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-# Get long description from the README file.
-with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
+with open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 # PyPI upload:
@@ -16,7 +15,7 @@ setup(
     description='Python package designed for security returns analysis.',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    version='1.2.6',
+    version='1.2.7',
     author='Brad Solomon',
     author_email='brad.solomon.1124@gmail.com',
     url='https://github.com/bsolomon1124/pyfinance',

@@ -60,7 +60,7 @@ __all__ = [
     "uniqify",
 ]
 
-from collections import Callable
+from collections.abc import Callable
 import inspect
 import itertools
 import random

@@ -76,9 +76,9 @@ from pandas.tseries import offsets
 
 try:
     from pandas.tseries.frequencies import FreqGroup, get_freq_code
-except ImportError:  # 0.24+, or somewhere around then
-    from pandas._libs.tslibs.frequencies import FreqGroup, get_freq_code
-
+except ImportError:
+    from pandas._libs.tslibs.dtypes import FreqGroup
+    from pandas.tests.tslibs.test_period_asfreq import get_freq_code
 
 PY37 = sys.version_info.major == 3 and sys.version_info.minor >= 7
 

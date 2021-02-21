@@ -60,7 +60,7 @@ __all__ = [
     "uniqify",
 ]
 
-from collections import Callable
+from collections.abc import Callable
 import inspect
 import itertools
 import random
@@ -76,8 +76,13 @@ from pandas.tseries import offsets
 
 try:
     from pandas.tseries.frequencies import FreqGroup, get_freq_code
-except ImportError:  # 0.24+, or somewhere around then
-    from pandas._libs.tslibs.frequencies import FreqGroup, get_freq_code
+except ImportError:
+    from pandas._libs.tslibs import to_offset
+    from pandas._libs.tslibs.dtypes import FreqGroup
+
+    def get_freq_code(freqstr):
+        off = to_offset(freqstr)
+        return off._period_dtype_code, off.n
 
 
 PY37 = sys.version_info.major == 3 and sys.version_info.minor >= 7
@@ -534,7 +539,7 @@ def get_anlz_factor(freq):
     # 'Q-NOV' would give us (2001, 1); we just want (2000, 1).
     try:
         base, mult = get_freq_code(freq)
-    except ValueError:
+    except (ValueError, AttributeError):
         # The above will fail for a bunch of irregular frequencies, such
         # as 'Q-NOV' or 'BQS-APR'
         freq = freq.upper()

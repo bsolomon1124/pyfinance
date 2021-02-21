@@ -8,7 +8,7 @@ It is meant to be a complement to existing packages geared towards quantitative 
 <table>
 <tr>
   <td>Supports</td>
-  <td>Python 3.5 | 3.6 | 3.7</td>
+  <td>Python 3.5 | 3.6 | 3.7 | 3.8 | 3.9</td>
 </tr>
 <tr>
   <td>Latest Release</td>
@@ -37,7 +37,6 @@ It is meant to be a complement to existing packages geared towards quantitative 
 
 ## Contents
 
-
 pyfinance is best explored on a module-by-module basis:
 
 | Module | Description |
@@ -53,10 +52,10 @@ Please note that `returns` and `general` are still in development; they are not 
 
 Installation
 
-pyfinance is available via [PyPI](https://pypi.python.org/pypi/pyfinance/).  The latest version is 1.0.1 as of March 2018.  Install with pip:
+pyfinance is available via [PyPI](https://pypi.python.org/pypi/pyfinance/).  Install with pip:
 
-```
-$ pip3 install pyfinance
+```bash
+$ python3 -m install pyfinance
 ```
 
 **Note**: pyfinance aims for compatibility with all minor releases of Python 3.x, but does not guarantee workability with Python 2.x.

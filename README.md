@@ -2,7 +2,7 @@
 
 pyfinance is a Python package built for investment management and analysis of security returns.
 
-It is meant to be a complement to existing packages geared towards quantitative finance, such as [pyfolio](https://github.com/quantopian/pyfolio), 
+It is meant to be a complement to existing packages geared towards quantitative finance, such as [pyfolio](https://github.com/quantopian/pyfolio),
 [pandas-datareader](https://github.com/pydata/pandas-datareader), and [fecon235](https://github.com/rsvp/fecon235).
 
 <table>

@@ -4,6 +4,13 @@ Changes prior to version 0.2.0 are untracked.
 
 Versioning attempts to follow the specifications laid out in [PEP 440](https://www.python.org/dev/peps/pep-0440/).
 
+## 1.3.0
+
+- Bugfix: address `import` changes required by Pandas versions 1.1+
+- Test on and support Python 3.8 and Python 3.9
+- Loosen requirements version specifiers in setup.py
+- Add `__version__` attribute to package
+
 ## 1.2.5
 
 - Bugfix: fix a false-positive ValueError (see d59e7ca)

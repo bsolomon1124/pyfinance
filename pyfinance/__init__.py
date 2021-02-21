@@ -26,7 +26,7 @@ Modules
 """
 
 __author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
-
+__version__ = '1.3.0'
 
 # Echoing Pandas, bring these to top-level namespace.
 from .returns import TFrame, TSeries  # noqa

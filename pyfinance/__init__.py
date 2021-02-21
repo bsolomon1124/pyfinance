@@ -25,7 +25,7 @@ Modules
 `utils.py`     Utilities not fitting into any of the above.
 """
 
-__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
+__author__ = "Brad Solomon <bsolomon@protonmail.com>"
 __version__ = '1.3.0'
 
 # Echoing Pandas, bring these to top-level namespace.

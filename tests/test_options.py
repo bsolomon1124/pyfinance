@@ -1,4 +1,4 @@
-# flake8: noqa
+# ruff: noqa
 
 # Test cases taken from:
 # - Thomas Ho Company LTD: financial models,
@@ -130,26 +130,14 @@ straddle = Straddle(St=s, K=k, callprice=c, putprice=p)
 
 
 def test_opstrats():
-    assert np.allclose(
-        bullspread.payoff(), np.array([100.0, 50.0, 0.0]), rtol=RTOL
-    )
-    assert np.allclose(
-        bullspread.profit(), np.array([51.55, 1.55, -48.45]), rtol=RTOL
-    )
+    assert np.allclose(bullspread.payoff(), np.array([100.0, 50.0, 0.0]), rtol=RTOL)
+    assert np.allclose(bullspread.profit(), np.array([51.55, 1.55, -48.45]), rtol=RTOL)
 
-    assert np.allclose(
-        bearspread.payoff(), np.array([0.0, 50.0, 100.0]), rtol=RTOL
-    )
-    assert np.allclose(
-        bearspread.profit(), np.array([-51.38, -1.38, 48.62]), rtol=RTOL
-    )
+    assert np.allclose(bearspread.payoff(), np.array([0.0, 50.0, 100.0]), rtol=RTOL)
+    assert np.allclose(bearspread.profit(), np.array([-51.38, -1.38, 48.62]), rtol=RTOL)
 
-    assert np.allclose(
-        bfly.payoff(), np.array([0.0, 25.0, 25.0, 0.0]), rtol=RTOL
-    )
-    assert np.allclose(
-        bfly.profit(), np.array([-4.91, 20.09, 20.09, -4.91]), rtol=RTOL
-    )
+    assert np.allclose(bfly.payoff(), np.array([0.0, 25.0, 25.0, 0.0]), rtol=RTOL)
+    assert np.allclose(bfly.profit(), np.array([-4.91, 20.09, 20.09, -4.91]), rtol=RTOL)
 
     assert np.allclose(straddle.payoff(), np.array([100.0, 100.0]), rtol=RTOL)
     assert np.allclose(straddle.profit(), np.array([-61.0, -61.0]), rtol=RTOL)

@@ -1,0 +1,144 @@
+name: Publish
+
+# Tag-triggered publish to PyPI via Trusted Publishing (OIDC).
+#
+# Security posture (for a lightly-used open-source project with a
+# single maintainer):
+# - Trigger is restricted to tag pushes matching `v*`. Manual runs
+#   (`workflow_dispatch`) are not enabled on this workflow, so a
+#   compromised PR cannot invoke it.
+# - All third-party actions are pinned to full commit SHAs. The
+#   trailing `# vX.Y.Z` comment is informational; Dependabot is
+#   configured to bump the SHAs via PRs.
+# - The publish step runs in the `pypi` GitHub Environment. Configure
+#   that environment in repo settings to require manual approval and
+#   restrict which branches/tags it's callable from — this is the
+#   main control against a malicious contributor pushing a tag.
+# - The package version is sourced from pyproject.toml; CI refuses to
+#   publish when the tag and pyproject version disagree.
+# - `contents: write` is only granted to the release-creation job;
+#   `id-token: write` is only granted to the PyPI-publish job; every
+#   other job runs with read-only permissions.
+
+on:
+  push:
+    tags: ["v*"]
+
+# Default: least privilege. Specific jobs opt into more.
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - name: Verify tag matches pyproject.toml version
+        id: version
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          project_version="$(uv run python -c 'import tomllib, pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          if [ "$tag_version" != "$project_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME (=$tag_version) does not match pyproject.toml version $project_version"
+            exit 1
+          fi
+          echo "version=$project_version" >> "$GITHUB_OUTPUT"
+      - name: Run tests before build
+        run: uv sync --locked && uv run pytest
+      - name: Build sdist + wheel
+        run: uv build
+      - name: Produce SBOM (requirements-format)
+        run: uv export --format requirements-txt --no-dev --no-hashes --output-file dist/requirements.sbom.txt
+      - name: Upload distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+
+  sign:
+    name: Sigstore-sign distributions
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      id-token: write  # Sigstore OIDC
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Sign with Sigstore
+        uses: sigstore/gh-action-sigstore-python@f514d46b907ebcd5bedc05145c03b69c1edd8b46 # v3.0.0
+        with:
+          inputs: ./dist/*.tar.gz ./dist/*.whl
+      - name: Upload signed distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build, sign]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyfinance
+    permissions:
+      id-token: write  # Trusted Publishing (OIDC → PyPI)
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        with:
+          # Include neither Sigstore bundles nor the SBOM in the PyPI
+          # upload; those are attached to the GitHub Release below.
+          packages-dir: dist/
+          skip-existing: false
+          attestations: true
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build, sign, publish-pypi]
+    permissions:
+      contents: write  # GitHub Release creation
+    steps:
+      - name: Download signed distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: signed-distributions
+          path: dist/
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          name: v${{ needs.build.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/*.tar.gz
+            dist/*.whl
+            dist/*.sigstore
+            dist/*.sigstore.json
+            dist/requirements.sbom.txt

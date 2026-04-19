@@ -1,4 +1,4 @@
-# flake8: noqa
+# ruff: noqa
 
 # This is a kludgy way about things--it uses hardcoded values pulled
 #     from Excel's Data Analysis > Regression tool as target values.
@@ -921,9 +921,7 @@ x2 = np.array(
 )
 
 x = np.stack((x1, x2)).T  # shape (7, 2) - x1 and x2 as columns
-x_with = np.stack(
-    (x1, x2, np.repeat(1.0, len(x1)))
-).T  # with artificial constant
+x_with = np.stack((x1, x2, np.repeat(1.0, len(x1)))).T  # with artificial constant
 x1_with = np.stack((x1, np.repeat(1.0, len(x1)))).T  # with artificial constant
 
 outs = (
@@ -935,9 +933,7 @@ outs = (
             [2.29513731, -0.6887367],
         ]
     ),
-    np.array(
-        [[2.0, 0.0, 1.0], [2.0, 0.0, 1.0], [2.0, 0.0, 1.0], [2.0, 0.0, 1.0]]
-    ),
+    np.array([[2.0, 0.0, 1.0], [2.0, 0.0, 1.0], [2.0, 0.0, 1.0], [2.0, 0.0, 1.0]]),
     np.array([[2.0, 1.0], [2.0, 1.0], [2.0, 1.0], [2.0, 1.0]]),
     np.array([2.42857143, 2.33333333, 2.25925926, 2.20930233]),
 )
@@ -972,9 +968,7 @@ def test_const_false():
         has_const=False,
         use_const=False,
     )
-    assert np.allclose(
-        rr.beta.values, np.array([[3.0], [2.6], [2.38461538], [2.28]])
-    )
+    assert np.allclose(rr.beta.values, np.array([[3.0], [2.6], [2.38461538], [2.28]]))
 
 
 def test_add_const():

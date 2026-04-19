@@ -1,0 +1,145 @@
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[project]
+name = "pyfinance"
+version = "2.0.0"
+description = "Python package designed for security returns analysis."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+authors = [{ name = "Brad Solomon" }]
+requires-python = ">=3.10,<3.15"
+keywords = [
+    "finance",
+    "investment",
+    "analysis",
+    "regression",
+    "options",
+    "securities",
+    "CAPM",
+    "machine learning",
+    "risk",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "beautifulsoup4",
+    "matplotlib",
+    "numpy",
+    "pandas>=2,<3",
+    "pandas-datareader",
+    "requests",
+    "scipy",
+    "seaborn",
+    "scikit-learn",
+    "statsmodels",
+    "xlrd",
+    "xmltodict",
+]
+
+[project.urls]
+Homepage = "https://github.com/bsolomon1124/pyfinance"
+Repository = "https://github.com/bsolomon1124/pyfinance"
+Changelog = "https://github.com/bsolomon1124/pyfinance/blob/master/CHANGELOG.md"
+Issues = "https://github.com/bsolomon1124/pyfinance/issues"
+
+[dependency-groups]
+dev = [
+    "pytest>=7",
+    "pytest-cov>=5",
+    "ruff>=0.15",
+    "ty>=0.0.30",
+    "prek>=0.1",
+]
+
+[tool.uv.build-backend]
+module-name = "pyfinance"
+module-root = "src"
+source-include = [
+    "tests/**",
+    "CHANGELOG.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--cov=src/pyfinance",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-fail-under=75",
+]
+filterwarnings = [
+    # Pandas emits FutureWarnings on legacy freq codes like 'Q'/'M'/'A'.
+    # User-facing APIs that accept these codes translate them internally
+    # before hitting pandas; the remaining warnings come from docstring
+    # examples and legacy test inputs.
+    "ignore::FutureWarning",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "C4",   # flake8-comprehensions
+    "PIE",  # flake8-pie
+    "PT",   # flake8-pytest-style
+    "RET",  # flake8-return
+    "RUF",  # ruff-specific
+    "A",    # flake8-builtins
+    "PERF", # perflint
+]
+ignore = [
+    "E501",    # line-too-long: rely on the formatter
+    "PERF203", # try/except in a loop is sometimes necessary
+    "RUF012",  # mutable class attributes with ClassVar: noisy for this repo
+    "RUF002",  # ambiguous Unicode in docstrings (− minus sign, curly quotes)
+    "RUF003",  # ambiguous Unicode in comments (Stack Overflow attribution)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401", "F403", "F841", "PT011", "B017"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/pyfinance"]
+
+[tool.coverage.report]
+exclude_also = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+]

@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "pyfinance"
-version = "2.0.0"
+version = "2.0.1"
 description = "Python package designed for security returns analysis."
 readme = "README.md"
 license = "MIT"

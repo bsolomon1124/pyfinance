@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-04-19
+
+Re-release of 2.0.0 to work around two bugs in the publish workflow
+that blocked the 2.0.0 GitHub Release from completing. The published
+PyPI package content is identical to 2.0.0.
+
+### Fixed
+
+- `publish.yml`: the SBOM was being written to
+  `dist/requirements.sbom.txt`, where `pypa/gh-action-pypi-publish`
+  applied twine-style validation to it and failed with
+  `InvalidDistribution: Unknown distribution format`. SBOM is now
+  written to `sbom/requirements.sbom.txt`, uploaded as a separate
+  artifact, and attached to the GitHub Release from its own path.
+- `publish.yml`: removed a vestigial `dist/*.sigstore` glob from the
+  release-files list. `sigstore/gh-action-sigstore-python@v3`
+  produces only `.sigstore.json` bundle files; the empty glob was
+  aborting the release step because `fail_on_unmatched_files: true`.
+
 ## [2.0.0] - 2026-04-18
 
 ### Added
@@ -222,7 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Thorough PEP 8 linting via flake8.
 
-[Unreleased]: https://github.com/bsolomon1124/pyfinance/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/bsolomon1124/pyfinance/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/bsolomon1124/pyfinance/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/bsolomon1124/pyfinance/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/bsolomon1124/pyfinance/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/bsolomon1124/pyfinance/compare/v1.2.4...v1.2.5

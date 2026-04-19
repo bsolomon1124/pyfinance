@@ -13,7 +13,7 @@ statistical toolkit.
 
 ## Status
 
-- **Latest release:** 2.0.0
+- **Latest release:** 2.0.1
 - **Python:** 3.10, 3.11, 3.12, 3.13, 3.14
 - **License:** MIT
 

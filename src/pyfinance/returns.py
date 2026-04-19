@@ -869,7 +869,9 @@ class TSeries(pd.Series):
                 raise FrequencyError("Could not infer `freq`; pass it explicitly.")
         factor = utils.get_anlz_factor(freq)
         n = self.count() - ddof
-        ss = (nansum(np.minimum(self - threshold, 0.0) ** 2) ** 0.5) / n
+        # Formula: sqrt( sum(min(x - t, 0)^2) / (n - ddof) ).
+        # Previously the `/ n` was incorrectly outside the sqrt.  See #15.
+        ss = (nansum(np.minimum(self - threshold, 0.0) ** 2) / n) ** 0.5
         return ss * factor**0.5
 
     def sharpe_ratio(self, rf=0.02, ddof=0):

@@ -117,6 +117,56 @@ class TestTSeriesScalarStats:
     def test_semi_stdev_nonneg(self, daily_returns: TSeries):
         assert daily_returns.semi_stdev(freq="D") >= 0
 
+    def test_semi_stdev_matches_docstring_formula(self):
+        """Regression test for #15.
+
+        The docstring promises:
+            sqrt( sum(min(x - t, 0)^2) / (n - ddof) )
+
+        Until 2.0.1 the implementation placed `/ n` *outside* the sqrt,
+        yielding values an order of magnitude too small. Pin the exact
+        formula here so the bug cannot silently regress.
+        """
+        vals = [
+            -0.01, 0.02, -0.03, 0.01, -0.02,
+             0.03, -0.01, 0.02, -0.01, 0.01,
+        ]
+        idx = pd.date_range("2020-01-01", periods=len(vals), freq="D")
+        ts = TSeries(vals, index=idx)
+
+        n = len(vals)
+        downside_sq = sum(min(v, 0.0) ** 2 for v in vals)
+        expected_periodic = np.sqrt(downside_sq / n)
+        # `semi_stdev(freq='D')` annualizes by sqrt(252).
+        expected_anlzd = expected_periodic * np.sqrt(252.0)
+
+        assert np.isclose(ts.semi_stdev(freq="D"), expected_anlzd, rtol=1e-12)
+
+    def test_semi_stdev_respects_ddof(self):
+        """`ddof` should change the denominator to (n - ddof) inside sqrt."""
+        vals = [-0.02, 0.01, -0.03, 0.02, -0.01]
+        idx = pd.date_range("2020-01-01", periods=len(vals), freq="D")
+        ts = TSeries(vals, index=idx)
+
+        downside_sq = sum(min(v, 0.0) ** 2 for v in vals)
+        for ddof in (0, 1, 2):
+            expected = np.sqrt(downside_sq / (len(vals) - ddof)) * np.sqrt(252.0)
+            assert np.isclose(
+                ts.semi_stdev(ddof=ddof, freq="D"), expected, rtol=1e-12
+            )
+
+    def test_semi_stdev_threshold_shifts_downside(self):
+        """A positive threshold should strictly widen the downside mask."""
+        vals = [0.005, 0.02, -0.01, 0.03, 0.001]
+        idx = pd.date_range("2020-01-01", periods=len(vals), freq="D")
+        ts = TSeries(vals, index=idx)
+
+        # Against threshold=0 only the -0.01 observation is downside.
+        base = ts.semi_stdev(threshold=0.0, freq="D")
+        # Against threshold=0.01, the 0.005 and 0.001 obs become downside too.
+        higher = ts.semi_stdev(threshold=0.01, freq="D")
+        assert higher > base
+
     def test_sharpe_and_sortino_are_finite(self, daily_returns: TSeries):
         assert np.isfinite(daily_returns.sharpe_ratio())
         assert np.isfinite(daily_returns.sortino_ratio(freq="D"))

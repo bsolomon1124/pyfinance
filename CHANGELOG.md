@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-04-19
+
+### Fixed
+
+- `pyfinance.returns.TSeries.semi_stdev`: the `/ n` denominator was
+  outside the square root, so the function returned values roughly an
+  order of magnitude smaller than the documented formula
+  `sqrt( sum(min(x - t, 0)^2) / (n - ddof) )`. This also affected any
+  downstream ratio that consumes semi-stdev. Thanks to @AlessandroQI
+  for the original report (#15).
+
+### Added
+
+- Regression tests pinning the exact `semi_stdev` formula, its `ddof`
+  behavior, and threshold monotonicity.
+
 ## [2.0.1] - 2026-04-19
 
 Re-release of 2.0.0 to work around two bugs in the publish workflow
@@ -241,7 +257,8 @@ PyPI package content is identical to 2.0.0.
 
 - Thorough PEP 8 linting via flake8.
 
-[Unreleased]: https://github.com/bsolomon1124/pyfinance/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/bsolomon1124/pyfinance/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/bsolomon1124/pyfinance/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/bsolomon1124/pyfinance/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/bsolomon1124/pyfinance/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/bsolomon1124/pyfinance/compare/v1.2.5...v1.3.0

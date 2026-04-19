@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `LICENSE.txt` renamed to `LICENSE`; copyright years updated to 2017–2026; author name normalized to "Brad Solomon".
+
 ## [2.0.2] - 2026-04-19
 
 ### Fixed

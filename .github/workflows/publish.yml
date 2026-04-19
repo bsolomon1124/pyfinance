@@ -155,6 +155,5 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/*.whl
-            dist/*.sigstore
             dist/*.sigstore.json
             sbom/requirements.sbom.txt

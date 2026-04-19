@@ -197,3 +197,7 @@ Two workflows, both with all third-party actions pinned to SHA256:
 
 Dependabot (`.github/dependabot.yml`) opens weekly PRs for
 `github-actions` SHAs and `uv` ecosystem updates.
+
+## Pull request titles
+
+Follow Conventional Commits format: `<type>: <description>` (e.g. `chore: update dependencies`, `fix: handle edge case`, `feat: add new statistic`).

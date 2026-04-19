@@ -951,7 +951,11 @@ outs = (
 def test__rolling_lstsq(x, y, window, out):
     xwins = utils.rolling_windows(x, window)
     ywins = utils.rolling_windows(y, window)
-    assert np.allclose(ols._rolling_lstsq(xwins, ywins), out)
+    # `_rolling_lstsq` now preserves the k-dimension axis (see #13 fix);
+    # callers that used to rely on the implicit 1-d squeeze for k=1 need
+    # to squeeze explicitly now.
+    result = ols._rolling_lstsq(xwins, ywins)
+    assert np.allclose(result.squeeze(), out)
 
 
 def test_const_false():
@@ -1019,3 +1023,78 @@ def test_1d_x():
     )
     assert np.allclose(rolling.x, np.array([2, 3, 4, 5, 6])[:, None])
     assert np.allclose(rolling.y, np.array([10, 11, 12, 13, 14]))
+
+
+# ---------------------------------------------------------------------
+# Regression tests for issue #13: `rsq` / `rsq_adj` were returning
+# nonsensical values when the model had no intercept (`use_const=False`),
+# because the R^2 formula used centered TSS that only applies when a
+# constant is present.  After the fix, both the static and rolling
+# cases return values in [0, 1] for well-behaved inputs and stay
+# numerically close to the `use_const=True` fit on the same data when
+# the true relationship does pass through the origin.
+# ---------------------------------------------------------------------
+
+
+def test_rsq_no_const_in_unit_interval_static():
+    data = {"A": [2, 3, 4, 5, 6], "B": [10, 11, 12, 13, 14]}
+    df = pd.DataFrame(data)
+    model = ols.OLS(
+        y=df["B"].values,
+        x=df["A"].values,
+        has_const=False,
+        use_const=False,
+    )
+    assert 0.0 <= model.rsq <= 1.0
+
+
+def test_rsq_no_const_matches_uncentered_formula():
+    """R² without intercept should equal 1 - SS_err / sum(y^2)."""
+    rng = np.random.default_rng(0)
+    n = 200
+    x = rng.normal(size=(n, 3))
+    # True relationship through the origin — ideal no-intercept fit.
+    y = x @ [0.8, -0.4, 1.1] + rng.normal(scale=0.1, size=n)
+
+    model = ols.OLS(y=y, x=x, has_const=False, use_const=False)
+    expected = 1.0 - np.sum(model.resids ** 2) / np.sum(y ** 2)
+    assert np.isclose(model.rsq, expected)
+
+
+def test_rsq_no_const_in_unit_interval_rolling():
+    # #13 exact repro: rsq used to return ~[938, 868, 801].
+    data = {"A": [2, 3, 4, 5, 6], "B": [10, 11, 12, 13, 14]}
+    df = pd.DataFrame(data)
+    rolling = ols.RollingOLS(
+        y=df["B"], x=df["A"], window=3, has_const=False, use_const=False
+    )
+    assert all(0.0 <= v <= 1.0 for v in rolling.rsq)
+
+
+def test_rsq_with_const_unchanged():
+    """Fix must not change the with-intercept branch."""
+    rng = np.random.default_rng(42)
+    n = 200
+    x = rng.normal(size=(n, 2))
+    y = 1.0 + x @ [1.5, -0.3] + rng.normal(scale=0.1, size=n)
+    model = ols.OLS(y=y, x=x, has_const=False, use_const=True)
+    # Expected: ss_reg / ss_tot using centered TSS.
+    yhat = model.predicted
+    ybar = y.mean()
+    expected = np.sum((yhat - ybar) ** 2) / np.sum((y - ybar) ** 2)
+    assert np.isclose(model.rsq, expected)
+
+
+def test_rolling_single_predictor_beta_shape():
+    """Regression: `_rolling_lstsq` used to squeeze the `k` axis for
+    single-predictor inputs, producing a 1-d `solution` that broke
+    downstream `_predicted`.  After the fix the solution is 2-d,
+    `(n_windows, k)`, for every k >= 1.
+    """
+    data = {"A": [2, 3, 4, 5, 6], "B": [10, 11, 12, 13, 14]}
+    df = pd.DataFrame(data)
+    r = ols.RollingOLS(
+        y=df["B"], x=df["A"], window=3, has_const=False, use_const=False
+    )
+    assert r.solution.ndim == 2
+    assert r.solution.shape == (3, 1)

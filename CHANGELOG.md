@@ -17,11 +17,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sqrt( sum(min(x - t, 0)^2) / (n - ddof) )`. This also affected any
   downstream ratio that consumes semi-stdev. Thanks to @AlessandroQI
   for the original report (#15).
+- `pyfinance.ols.OLS.rsq` / `.rsq_adj` and the rolling equivalents
+  were built around the centered total-sum-of-squares identity
+  `SS_reg + SS_err = SS_tot`, which only holds when the model has an
+  intercept. With `use_const=False` this produced nonsensical values
+  (e.g. `rsq=[938, 868, 801]` in the repro from #13). The no-intercept
+  branch now uses the uncentered form `R² = 1 - SS_err / sum(y²)`
+  with `rsq_adj = 1 - (1 - R²) * n / (n - k)`. Fix attributed to
+  @zhangda425's report (#13).
+- `pyfinance.ols._rolling_lstsq`: used a bare `np.squeeze(...)` that
+  collapsed the predictor-count axis (`k`) when there was a single
+  predictor, producing a 1-d `solution` that broke `_predicted`,
+  `_resids`, and every rsq / residual statistic on 1-predictor rolling
+  regressions. Now squeezes only the trailing axis (the one introduced
+  by `np.atleast_3d(y)`). **Note:** for `RollingOLS(..., use_const=False)`
+  with a single predictor, `r.beta` is now shape `(n_windows, 1)` where
+  previously it was `(n_windows,)`. Call `r.beta.squeeze()` for the
+  old shape.
 
 ### Added
 
 - Regression tests pinning the exact `semi_stdev` formula, its `ddof`
   behavior, and threshold monotonicity.
+- Regression tests covering the no-intercept `rsq` / `rsq_adj` fix for
+  both `OLS` and `RollingOLS`, plus a shape pin for the 1-predictor
+  rolling solution.
 
 ## [2.0.1] - 2026-04-19
 

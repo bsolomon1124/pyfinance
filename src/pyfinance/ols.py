@@ -63,12 +63,15 @@ def _rolling_lstsq(x, y):
         x = x[:, :, None]
     elif x.ndim <= 1:
         raise np.AxisError("x should have ndmi >= 2")
-    return np.squeeze(
-        np.matmul(
-            np.linalg.inv(np.matmul(x.swapaxes(1, 2), x)),
-            np.matmul(x.swapaxes(1, 2), np.atleast_3d(y)),
-        )
-    )
+    # Squeeze only the trailing axis (from `atleast_3d(y)` promoting y from
+    # shape `(n_windows, window)` to `(n_windows, window, 1)`). Using bare
+    # `np.squeeze` would also collapse the `k=1` axis when there is a single
+    # predictor, yielding a `(n_windows,)` solution that downstream code
+    # (e.g. `_predicted`) expects to be `(n_windows, k)`.
+    return np.matmul(
+        np.linalg.inv(np.matmul(x.swapaxes(1, 2), x)),
+        np.matmul(x.swapaxes(1, 2), np.atleast_3d(y)),
+    ).squeeze(axis=-1)
 
 
 def _confirm_constant(a):
@@ -291,15 +294,32 @@ class OLS:
 
     @property
     def rsq(self):
-        """The coefficent of determination, R-squared."""
-        return self.ss_reg / self.ss_tot
+        """The coefficent of determination, R-squared.
+
+        When the model contains an intercept, R² is defined against the
+        centered total sum of squares. With no intercept (`use_const=False`)
+        the identity `SS_reg + SS_err = SS_tot_centered` no longer holds,
+        so this falls back to the uncentered form
+        `1 - SS_err / sum(y**2)`.  See issue #13.
+        """
+        if self.use_const:
+            return self.ss_reg / self.ss_tot
+        ss_tot_uncentered = np.sum(np.square(self.y), axis=0)
+        return 1.0 - self.ss_err / ss_tot_uncentered
 
     @property
     def rsq_adj(self):
-        """Adjusted R-squared."""
+        """Adjusted R-squared.
+
+        With an intercept the denominator degrees-of-freedom is `n - k - 1`.
+        With no intercept there is no constant to subtract, so it becomes
+        `n - k`.
+        """
         n = self.n
         k = self.k
-        return 1.0 - ((1.0 - self.rsq) * (n - 1.0) / (n - k - 1.0))
+        if self.use_const:
+            return 1.0 - ((1.0 - self.rsq) * (n - 1.0) / (n - k - 1.0))
+        return 1.0 - ((1.0 - self.rsq) * n / (n - k))
 
     @property
     def _se_all(self):
@@ -405,6 +425,13 @@ class RollingOLS:
         )
         self.window = self.n = window
         self.xwins = utils.rolling_windows(self.x, window=window)
+        # `utils.rolling_windows` collapses a trailing singleton axis from
+        # `self.x` when k == 1, giving `xwins` shape `(n_windows, window)`
+        # instead of `(n_windows, window, 1)`.  Every consumer downstream
+        # (_predicted, _resids, _ss_*, _se_all) assumes the 3-d form, so
+        # restore it here.  See issue #13.
+        if self.xwins.ndim == 2:
+            self.xwins = self.xwins[:, :, None]
         self.ywins = utils.rolling_windows(self.y, window=window)
         self.solution = _rolling_lstsq(self.xwins, self.ywins)
         self.has_const = has_const
@@ -494,15 +521,23 @@ class RollingOLS:
 
     @property
     def _rsq(self):
-        """The coefficent of determination, R-squared."""
-        return self._ss_reg / self._ss_tot
+        """The coefficent of determination, R-squared.
+
+        See `OLS.rsq` for the `use_const=False` branch (issue #13).
+        """
+        if self.use_const:
+            return self._ss_reg / self._ss_tot
+        ss_tot_uncentered = np.sum(np.square(self.ywins), axis=1)
+        return 1.0 - self._ss_err / ss_tot_uncentered
 
     @property
     def _rsq_adj(self):
         """Adjusted R-squared."""
         n = self.n
         k = self.k
-        return 1.0 - ((1.0 - self._rsq) * (n - 1.0) / (n - k - 1.0))
+        if self.use_const:
+            return 1.0 - ((1.0 - self._rsq) * (n - 1.0) / (n - k - 1.0))
+        return 1.0 - ((1.0 - self._rsq) * n / (n - k))
 
     @property
     def _ms_err(self):

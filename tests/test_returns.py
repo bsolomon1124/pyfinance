@@ -128,8 +128,16 @@ class TestTSeriesScalarStats:
         formula here so the bug cannot silently regress.
         """
         vals = [
-            -0.01, 0.02, -0.03, 0.01, -0.02,
-             0.03, -0.01, 0.02, -0.01, 0.01,
+            -0.01,
+            0.02,
+            -0.03,
+            0.01,
+            -0.02,
+            0.03,
+            -0.01,
+            0.02,
+            -0.01,
+            0.01,
         ]
         idx = pd.date_range("2020-01-01", periods=len(vals), freq="D")
         ts = TSeries(vals, index=idx)
@@ -151,9 +159,7 @@ class TestTSeriesScalarStats:
         downside_sq = sum(min(v, 0.0) ** 2 for v in vals)
         for ddof in (0, 1, 2):
             expected = np.sqrt(downside_sq / (len(vals) - ddof)) * np.sqrt(252.0)
-            assert np.isclose(
-                ts.semi_stdev(ddof=ddof, freq="D"), expected, rtol=1e-12
-            )
+            assert np.isclose(ts.semi_stdev(ddof=ddof, freq="D"), expected, rtol=1e-12)
 
     def test_semi_stdev_threshold_shifts_downside(self):
         """A positive threshold should strictly widen the downside mask."""

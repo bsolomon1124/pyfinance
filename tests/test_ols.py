@@ -1057,7 +1057,7 @@ def test_rsq_no_const_matches_uncentered_formula():
     y = x @ [0.8, -0.4, 1.1] + rng.normal(scale=0.1, size=n)
 
     model = ols.OLS(y=y, x=x, has_const=False, use_const=False)
-    expected = 1.0 - np.sum(model.resids ** 2) / np.sum(y ** 2)
+    expected = 1.0 - np.sum(model.resids**2) / np.sum(y**2)
     assert np.isclose(model.rsq, expected)
 
 
@@ -1093,8 +1093,6 @@ def test_rolling_single_predictor_beta_shape():
     """
     data = {"A": [2, 3, 4, 5, 6], "B": [10, 11, 12, 13, 14]}
     df = pd.DataFrame(data)
-    r = ols.RollingOLS(
-        y=df["B"], x=df["A"], window=3, has_const=False, use_const=False
-    )
+    r = ols.RollingOLS(y=df["B"], x=df["A"], window=3, has_const=False, use_const=False)
     assert r.solution.ndim == 2
     assert r.solution.shape == (3, 1)

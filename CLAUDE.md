@@ -30,6 +30,34 @@ task test-matrix   # or: for V in 3.10 3.11 3.12 3.13 3.14; ...
 Coverage is wired through `pytest-cov`; the 75 % floor is enforced by
 `--cov-fail-under=75` in `[tool.pytest.ini_options]`.
 
+## Before pushing: mandatory pre-push gauntlet
+
+CI runs **four** gates that can independently fail, and `ruff check`
+passing does **not** imply `ruff format --check` passes. Always run
+all four locally before pushing, in this order:
+
+```bash
+uv run ruff format        # REWRITES files — run first, review the diff
+uv run ruff check         # lint (separate from formatting)
+uv run pytest             # full suite + coverage gate
+uv run ty check           # type check (best-effort, not yet in CI)
+```
+
+Equivalent one-liner: `task check`.
+
+Or, preferred: run the full pre-commit suite so you catch everything
+CI checks plus markdownlint and the hygiene hooks:
+
+```bash
+uv run prek run --all-files
+```
+
+**Do not trust a passing `ruff check` to mean formatting is clean.**
+Past regressions: appending new tests without a subsequent
+`ruff format` run has silently broken CI's `ruff format --check` step
+twice. The `pre-commit` hook also catches this; install with
+`uv run prek install` to have it run on every commit.
+
 ## High-level architecture
 
 Six modules in `src/pyfinance/`. Public re-exports live in

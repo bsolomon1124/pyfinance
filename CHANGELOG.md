@@ -7,74 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-04-18
+
 ### Added
 
 - `py.typed` marker ships in the wheel; PEP 561 consumers now pick up
-  inline types.
+  inline types. `Typing :: Typed` classifier set.
 - `pyfinance.general.EwmParams` TypedDict as the return type of
   `ewm_params`; `pyfinance.general.EwmParam` Literal alias for the
   `param` argument.
 - `pyfinance.ols.RegressionResult` Protocol describing the attributes
   common to `OLS`, `RollingOLS`, and `PandasRollingOLS`.
-- `Taskfile.yml` command shortcuts for the common dev workflow (task
-  [install/test/lint/fmt/typecheck/check/build/sbom/pre-commit/clean]).
+- Literal type aliases on public APIs: `OptionKind` (`BSM`),
+  `InFormat` (`activeshare`), `RateFreq` / `RfFreq` (`datasets`).
+- `Taskfile.yml` command shortcuts for the common dev workflow
+  (`task install / test / test-cov / test-matrix / lint / fmt /
+  fmt-check / typecheck / mdlint / check / build / sbom / pre-commit
+  / clean`).
 - `.pre-commit-config.yaml` (ruff-check, ruff-format, ty, hygiene
   hooks, markdownlint-cli2); compatible with `prek`.
-- `.github/dependabot.yml` for github-actions and uv ecosystems.
-- `.github/workflows/publish.yml` — tag-triggered PyPI publish via OIDC
-  trusted publishing, Sigstore signing, SBOM attachment, GitHub Release
-  creation. All actions pinned to SHA256.
-- Shields.io badges on README.md (PyPI version, license, pyversions).
-- README shows Python 3.14 in the supported-versions list.
-
-### Changed
-
-- Broader ruff rule selection (C4, PT, RET, PIE, PERF, RUF, A) in
-  addition to the earlier E/W/F/I/UP/B/SIM set.
-- Coverage enforced at 75 % via pytest-cov; `.coveragerc` equivalents
-  live in `[tool.coverage.*]` in `pyproject.toml`.
-- `pyfinance.datasets.load_rates`, `load_rf`, `load_13f`,
-  `load_industries` gained full type annotations with `Literal`
-  frequency aliases.
-- `pyfinance.options.BSM.__init__` gained an `OptionKind` `Literal`
-  annotation.
-
-### Fixed
-
-- `pyfinance.utils.get_anlz_factor`: `PERIODS_PER_YEAR` was keyed by
-  `FreqGroup` enum members but looked up with a raw integer — in
-  pandas 2.x `FreqGroup` is a plain `Enum` (not `IntEnum`) so lookups
-  silently failed. Keyed on `.value` now. Also accepts already-resolved
-  numeric factors from `_try_get_freq`.
-- `pyfinance.returns.TSeries.anlzd_stdev` and `.semi_stdev`: treated
-  the `freq` string as a number, raising `TypeError: unsupported
-  operand type(s) for ** or pow(): 'str' and 'float'`. Now calls
-  `utils.get_anlz_factor` to resolve the frequency first.
-- `pyfinance.returns.TSeries.__init__`: dropped the monotonic-index
-  check that fired on every internal pandas reverse-slice (breaking
-  `drawdown_start` / `drawdown_length` among others).
-- `pyfinance.general.factor_loadings`: fixed a latent comma-omission
-  that turned `("Price-Signal Model", [...])(...)` into a call on a
-  tuple; raised `TypeError` at import/first-call on any modern
-  Python. (Function is still otherwise broken — see Deprecated.)
-
-### Deprecated
-
-- `pyfinance.general.amortize`, `factor_loadings`, `PortSim`, and
-  `corr_heatmap`/`PCA.screeplot` are marked `# pragma: no cover`
-  because they depend on removed NumPy APIs (`np.ppmt`/`ipmt`/`pmt`),
-  broken internal calls, or are purely visual. They still import
-  cleanly but are not exercised by the test suite; planned for
-  rewrite in 2.1.
-
-## [2.0.0] - 2026-04-18
-
-### Added
-
+- `.github/workflows/ci.yml` — SHA-pinned matrix CI across Python
+  3.10–3.14 with lint / test / build jobs.
+- `.github/workflows/publish.yml` — tag-triggered PyPI publish via
+  OIDC trusted publishing, Sigstore signing, SBOM attachment, GitHub
+  Release creation. All actions pinned to SHA256.
+- `.github/dependabot.yml` for `github-actions` and `uv` ecosystems.
 - Offline smoke tests for `pyfinance.datasets` covering the lazy
   `pandas_datareader` proxy and the public surface of the module.
 - `user_agent` (required) parameter on `pyfinance.datasets.load_13f`,
   per SEC EDGAR fair-access policy.
+- Shields.io badges on README.md (PyPI version, license, pyversions).
 
 ### Changed
 
@@ -103,7 +65,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   place (`pyproject.toml`).
 - Adopt [`ruff`](https://docs.astral.sh/ruff/) for linting and
   formatting, and [`ty`](https://github.com/astral-sh/ty) for type
-  checking. Legacy `black` / `flake8` references removed.
+  checking. Legacy `black` / `flake8` references removed. Enabled rule
+  set: `E W F I UP B SIM C4 PT RET PIE PERF RUF A`.
+- Coverage enforced at 75 % via `pytest-cov`; configuration lives in
+  `[tool.pytest.ini_options]` and `[tool.coverage.*]` in
+  `pyproject.toml`.
 - Rename `LICENSE` → `LICENSE.txt`.
 
 ### Removed
@@ -137,9 +103,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replace `pd.read_excel(..., skip_footer=...)` with `skipfooter=...`;
   replace removed `Index.is_all_dates` with
   `isinstance(index, pd.DatetimeIndex)` in `TSeries.anlzd_ret`.
+- `pyfinance.utils.get_anlz_factor`: `PERIODS_PER_YEAR` was keyed by
+  `FreqGroup` enum members but looked up with a raw integer — in
+  pandas 2.x `FreqGroup` is a plain `Enum` (not `IntEnum`) so lookups
+  silently failed. Keyed on `.value` now. Also accepts already-resolved
+  numeric factors from `_try_get_freq`.
+- `pyfinance.returns.TSeries.anlzd_stdev` and `.semi_stdev`: treated
+  the `freq` string as a number, raising `TypeError: unsupported
+  operand type(s) for ** or pow(): 'str' and 'float'`. Now calls
+  `utils.get_anlz_factor` to resolve the frequency first.
+- `pyfinance.returns.TSeries.__init__`: dropped the monotonic-index
+  check that fired on every internal pandas reverse-slice (breaking
+  `drawdown_start` / `drawdown_length` among others).
+- `pyfinance.general.factor_loadings`: fixed a latent comma-omission
+  that turned `("Price-Signal Model", [...])(...)` into a call on a
+  tuple; raised `TypeError` at import/first-call on any modern
+  Python. (Function is still otherwise broken — see Deprecated.)
 - `pyfinance.datasets.load_rates`: the daily 1-month non-financial
   commercial paper series was listed as `DCPN30` (a non-existent FRED
   symbol); it is now `DCPN1M`.
+
+### Deprecated
+
+- `pyfinance.general.amortize`, `factor_loadings`, `PortSim`, and
+  `corr_heatmap` / `PCA.screeplot` are marked `# pragma: no cover`
+  because they depend on removed NumPy APIs (`np.ppmt` / `ipmt` /
+  `pmt`), broken internal calls, or are purely visual. They still
+  import cleanly but are not exercised by the test suite; planned
+  for rewrite in 2.1.
 
 ## [1.3.0]
 

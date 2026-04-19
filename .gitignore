@@ -105,6 +105,9 @@ celerybeat-schedule
 # SageMath parsed files
 *.sage.py
 
+# uv
+.uv_cache/
+
 # Environments
 .env
 .venv

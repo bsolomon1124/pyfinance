@@ -21,23 +21,22 @@ is strictly preferrable to composition or piping.
     https://pandas.pydata.org/pandas-docs/stable/internals.html
 """
 
-__all__ = ["TSeries", "TFrame"]
-__author__ = "Brad Solomon <brad.solomon.1124@gmail.com>"
+__all__ = ["TFrame", "TSeries"]
 
 import copy
 from numbers import Number
 
 import numpy as np
-from numpy.lib.nanfunctions import (
-    nanmin,
-    nansum,
-    nanprod,
-    nancumsum,
-    nancumprod,
-    nanmean,
-    nanstd,
-)
 import pandas as pd
+from numpy import (
+    nancumprod,
+    nancumsum,
+    nanmean,
+    nanmin,
+    nanprod,
+    nanstd,
+    nansum,
+)
 
 from pyfinance import ols, utils
 
@@ -54,13 +53,9 @@ class TSeries(pd.Series):
         super().__init__(*args, **kwargs)
         self.freq = freq
 
-        # Hold off on inferring a frequency until method calls.
-        # Otherwise, this routine is run unncessarily because
-        # __init__ gets called somewhat frequently
-        # (with __repr__, for instance).
-
-        if not self.index.is_monotonic_increasing:
-            raise FrequencyError("Input Index should be sorted.")
+        # Hold off on inferring a frequency until method calls. __init__
+        # fires on every subclass operation (including reverse-slices that
+        # `_constructor` dispatches through us), so we can't validate here.
 
     @property
     def _constructor(self):
@@ -121,7 +116,7 @@ class TSeries(pd.Series):
         float
         """
 
-        if self.index.is_all_dates:
+        if isinstance(self.index, pd.DatetimeIndex):
             # TODO: Could be more granular here,
             #       for cases with < day frequency.
             td = self.index[-1] - self.index[0]
@@ -133,8 +128,7 @@ class TSeries(pd.Series):
             freq = freq if freq is not None else self.freq
             if freq is None:
                 raise FrequencyError(
-                    "Must specify a `freq` when a"
-                    " datetime-like index is not used."
+                    "Must specify a `freq` when a datetime-like index is not used."
                 )
 
             n = len(self) / utils.get_anlz_factor(freq)
@@ -168,8 +162,9 @@ class TSeries(pd.Series):
         if freq is None:
             freq = self._try_get_freq()
             if freq is None:
-                raise FrequencyError(msg)
-        return nanstd(self, ddof=ddof) * freq ** 0.5
+                raise FrequencyError("Could not infer `freq`; pass it explicitly.")
+        factor = utils.get_anlz_factor(freq)
+        return nanstd(self, ddof=ddof) * factor**0.5
 
     def batting_avg(self, benchmark):
         """Percentage of periods when `self` outperformed `benchmark`.
@@ -284,12 +279,8 @@ class TSeries(pd.Series):
             op1, op2 = compare_op
         else:
             op1, op2 = compare_op, compare_op
-        uc = self.up_capture(
-            benchmark=benchmark, threshold=threshold, compare_op=op1
-        )
-        dc = self.down_capture(
-            benchmark=benchmark, threshold=threshold, compare_op=op2
-        )
+        uc = self.up_capture(benchmark=benchmark, threshold=threshold, compare_op=op1)
+        dc = self.down_capture(benchmark=benchmark, threshold=threshold, compare_op=op2)
         return uc / dc
 
     def cuml_ret(self):
@@ -514,18 +505,17 @@ class TSeries(pd.Series):
             er = self.excess_ret(benchmark=benchmark, method="arithmetic")
             return er.drawdown_idx()
 
-        elif method == "cger":
+        if method == "cger":
             er = self.excess_ret(benchmark=benchmark, method="geometric")
             return er.drawdown_idx()
 
-        elif method == "ecr":
+        if method == "ecr":
             er = self.ret_idx() - benchmark.ret_idx() + 1
             if er.isnull().any():
                 return er / er.cummax() - 1.0
-            else:
-                return er / np.maximum.accumulate(er) - 1.0
+            return er / np.maximum.accumulate(er) - 1.0
 
-        elif method == "ecrr":
+        if method == "ecrr":
             # Credit to: SO @piRSquared
             # https://stackoverflow.com/a/36848867/7954504
             p = self.ret_idx().values
@@ -540,14 +530,13 @@ class TSeries(pd.Series):
             b0 = b[cam]
             return (p * b0 - b * p0) / (p0 * b0)
 
-        else:
-            raise ValueError(
-                "`method` must be one of"
-                " ('caer', 'cger', 'ecr', 'ecrr'),"
-                " case-insensitive, or"
-                " an integer mapping to these methods"
-                " (1 thru 4)."
-            )
+        raise ValueError(
+            "`method` must be one of"
+            " ('caer', 'cger', 'ecr', 'ecrr'),"
+            " case-insensitive, or"
+            " an integer mapping to these methods"
+            " (1 thru 4)."
+        )
 
     def excess_ret(self, benchmark, method="arithmetic"):
         """Excess return.
@@ -575,12 +564,11 @@ class TSeries(pd.Series):
 
         if method.startswith("arith"):
             return self - _try_to_squeeze(benchmark)
-        elif method.startswith("geo"):
+        if method.startswith("geo"):
             # Geometric excess return,
             # (1 + `self`) / (1 + `benchmark`) - 1.
-            return (
-                self.ret_rels() / _try_to_squeeze(benchmark).ret_rels() - 1.0
-            )
+            return self.ret_rels() / _try_to_squeeze(benchmark).ret_rels() - 1.0
+        return None
 
     def gain_to_loss_ratio(self):
         """Gain-to-loss ratio, ratio of positive to negative returns.
@@ -736,10 +724,7 @@ class TSeries(pd.Series):
 
         # If `res` is all False (recovery has not occured),
         # .idxmax() will return `res.index[0]`.
-        if not res.any():
-            recov = pd.NaT
-        else:
-            recov = res.idxmax()
+        recov = pd.NaT if not res.any() else res.idxmax()
 
         if return_date:
             return recov.date()
@@ -792,7 +777,7 @@ class TSeries(pd.Series):
         >>> from pyfinance import TSeries
         >>> np.random.seed(444)
         >>> ts = TSeries(np.random.randn(12) / 100 + 0.002,
-        ...              index=pd.date_range('2016', periods=12, freq='M'))
+        ...              index=pd.date_range('2016', periods=12, freq='ME'))
         >>> ts.rollup('Q')
         2016-03-31    0.0274
         2016-06-30   -0.0032
@@ -881,10 +866,11 @@ class TSeries(pd.Series):
         if freq is None:
             freq = self._try_get_freq()
             if freq is None:
-                raise FrequencyError(msg)
+                raise FrequencyError("Could not infer `freq`; pass it explicitly.")
+        factor = utils.get_anlz_factor(freq)
         n = self.count() - ddof
         ss = (nansum(np.minimum(self - threshold, 0.0) ** 2) ** 0.5) / n
-        return ss * freq ** 0.5
+        return ss * factor**0.5
 
     def sharpe_ratio(self, rf=0.02, ddof=0):
         """Return over `rf` per unit of total risk.
@@ -1180,13 +1166,9 @@ class TSeries(pd.Series):
         pyfinance.ols.OLS
         """
 
-        return ols.OLS(
-            y=self, x=benchmark, has_const=has_const, use_const=use_const
-        )
+        return ols.OLS(y=self, x=benchmark, has_const=has_const, use_const=use_const)
 
-    def _mkt_filter(
-        self, benchmark, threshold, compare_op, include_benchmark=False
-    ):
+    def _mkt_filter(self, benchmark, threshold, compare_op, include_benchmark=False):
         benchmark = _try_to_squeeze(benchmark)
         if not isinstance(benchmark, (TFrame, TSeries)):
             raise ValueError("`benchmark` must be TFrame or TSeries.")
@@ -1195,8 +1177,7 @@ class TSeries(pd.Series):
         mask = compare_op(threshold).values
         if not include_benchmark:
             return self.loc[mask]
-        else:
-            return self.loc[mask], benchmark.loc[mask]
+        return self.loc[mask], benchmark.loc[mask]
 
     def _validate_rf(self, rf):
         if not isinstance(rf, Number):
@@ -1241,21 +1222,18 @@ def _try_to_squeeze(obj, raise_=False):
 
     if isinstance(obj, pd.Series):
         return obj
-    elif isinstance(obj, pd.DataFrame) and obj.shape[-1] == 1:
+    if isinstance(obj, pd.DataFrame) and obj.shape[-1] == 1:
         return obj.squeeze()
-    else:
-        if raise_:
-            raise ValueError("Input cannot be squeezed.")
-        return obj
+    if raise_:
+        raise ValueError("Input cannot be squeezed.")
+    return obj
 
 
 class FrequencyError(ValueError):
     """Index frequency misspecified, missing, or not inferrable."""
 
-    pass
 
-
-class TFrame(object):
+class TFrame:
     def __init__(self):
         raise NotImplementedError
 
@@ -1303,9 +1281,8 @@ def _truncate_method_docstring(doc):
     p, r = doc.find(param), doc.find(ret)
     if p == r == -1:
         return doc
-    else:
-        m = min(p if p != -1 else r, r if r != -1 else p)
-        return doc[:m]
+    m = min(p if p != -1 else r, r if r != -1 else p)
+    return doc[:m]
 
 
 methods = (
@@ -1359,7 +1336,7 @@ tseries_method_doc = ""
 for method in methods:
     try:
         mdoc = _truncate_method_docstring(getattr(TSeries, method).__doc__)
-        tseries_method_doc += "{} : {}\n\n".format(method, mdoc.strip())
+        tseries_method_doc += f"{method} : {mdoc.strip()}\n\n"
     except AttributeError:
         # No docstring (yet).
         pass

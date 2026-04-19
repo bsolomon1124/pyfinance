@@ -1,0 +1,16 @@
+# markdownlint-cli2 configuration for pyfinance
+config:
+  # Allow longer lines for readability in code examples and tables.
+  MD013:
+    line_length: 120
+    code_blocks: false
+    tables: false
+  # Allow inline HTML for shields/badges.
+  MD033: false
+  # Allow bare-URL-style shell prompts; this repo uses `uv` without the
+  # `$` prefix, so this mostly doesn't trigger, but keep it off anyway.
+  MD014: false
+ignores:
+  - CHANGELOG.md
+  - .venv
+  - node_modules

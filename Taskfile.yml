@@ -1,0 +1,86 @@
+# https://taskfile.dev
+version: '3'
+
+tasks:
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - task --list
+
+  install:
+    desc: "Install runtime + dev deps from the lockfile"
+    cmds:
+      - uv sync --locked
+
+  test:
+    desc: "Run the test suite"
+    cmds:
+      - uv run pytest
+
+  test-cov:
+    desc: "Run tests with coverage report"
+    cmds:
+      - uv run pytest --cov
+
+  test-matrix:
+    desc: "Run tests across every supported Python minor version"
+    cmds:
+      - |
+        for V in 3.10 3.11 3.12 3.13 3.14; do
+          echo "=== Python $V ==="
+          uv run --isolated --python $V --with pytest --with . pytest -q
+        done
+
+  lint:
+    desc: "ruff check"
+    cmds:
+      - uv run ruff check
+
+  fmt:
+    desc: "ruff format (in-place)"
+    cmds:
+      - uv run ruff format
+
+  fmt-check:
+    desc: "ruff format --check (CI-style)"
+    cmds:
+      - uv run ruff format --check
+
+  typecheck:
+    desc: "ty type checker"
+    cmds:
+      - uv run ty check
+
+  mdlint:
+    desc: "markdownlint-cli2 on all Markdown files"
+    cmds:
+      - npx --yes markdownlint-cli2 "*.md"
+
+  check:
+    desc: "Run the full CI-equivalent check locally (lint + format + typecheck + test)"
+    cmds:
+      - task: lint
+      - task: fmt-check
+      - task: typecheck
+      - task: test-cov
+      - task: mdlint
+
+  build:
+    desc: "Build sdist + wheel into ./dist"
+    cmds:
+      - uv build
+
+  sbom:
+    desc: "Produce a CycloneDX SBOM from the lockfile"
+    cmds:
+      - uv export --format requirements-txt --no-dev --no-hashes --output-file sbom-requirements.txt
+
+  pre-commit:
+    desc: "Run all prek/pre-commit hooks against every file"
+    cmds:
+      - uv run prek run --all-files
+
+  clean:
+    desc: "Remove build artifacts and caches"
+    cmds:
+      - rm -rf dist build .pytest_cache .ruff_cache .coverage htmlcov sbom-requirements.txt

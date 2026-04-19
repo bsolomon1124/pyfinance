@@ -1,7 +1,7 @@
 # pyfinance
 
 [![PyPI version](https://img.shields.io/pypi/v/pyfinance.svg)](https://pypi.org/project/pyfinance/)
-[![License: MIT](https://img.shields.io/pypi/l/pyfinance.svg)](https://github.com/bsolomon1124/pyfinance/blob/master/LICENSE.txt)
+[![License: MIT](https://img.shields.io/pypi/l/pyfinance.svg)](https://github.com/bsolomon1124/pyfinance/blob/master/LICENSE)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyfinance.svg)](https://pypi.org/project/pyfinance/)
 
 pyfinance is a Python package for investment management and analysis of
@@ -140,4 +140,4 @@ release notes for details and migration guidance.
 
 ## License
 
-MIT — see [LICENSE.txt](LICENSE.txt).
+MIT — see [LICENSE](LICENSE).
